@@ -23,3 +23,4 @@ results = validate_business_values(invalid_df)
 for error_type, rows in results.items():
     print(f"\n{error_type}:")
     print(rows)
+

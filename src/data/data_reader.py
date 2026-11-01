@@ -2,8 +2,14 @@ import pandas as pd
 
 
 def read_csv(file_path):
-    """Read a CSV file and return a Pandas DataFrame."""
-    return pd.read_csv(file_path)
+    """Read a CSV file and normalize its date column."""
+
+    df = pd.read_csv(file_path)
+
+    if "Date" in df.columns:
+        df["Date"] = pd.to_datetime(df["Date"], errors="coerce")
+
+    return df
 
 
 def read_excel(file_path):
@@ -21,3 +27,4 @@ def read_file(file_path):
 
     else:
         raise ValueError("Unsupported file format")
+

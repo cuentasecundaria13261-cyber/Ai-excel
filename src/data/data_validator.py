@@ -81,3 +81,20 @@ def validate_business_values(df):
         invalid_rows["invalid_revenue"] = df[df["Revenue"] < 0]
 
     return invalid_rows
+
+def validate_dataset(df):
+    """Run all dataset validation checks and return one report."""
+
+    report = {
+        "missing_columns": validate_columns(df),
+        "missing_values": validate_missing_values(df),
+        "duplicate_orders": (
+            validate_duplicates(df)
+            if "Order_ID" in df.columns
+            else None
+        ),
+        "invalid_data_types": validate_data_types(df),
+        "invalid_business_values": validate_business_values(df)
+    }
+
+    return report
