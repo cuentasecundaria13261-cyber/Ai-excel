@@ -1,0 +1,11 @@
+Order_ID,Date,Product,Category,Quantity,Unit_Price,Region,Payment_Method,Revenue
+ORD-001,2026-01-05,Laptop,Electronics,1,750,Panama City,Card,750
+ORD-002,2026-01-08,Mouse,Accessories,3,15,Colon,Cash,45
+ORD-003,2026-01-12,Keyboard,Accessories,2,35,Panama City,Card,70
+ORD-004,2026-02-03,Monitor,Electronics,1,200,David,Transfer,200
+ORD-005,2026-02-10,Laptop,Electronics,2,750,Colon,Card,1500
+ORD-006,2026-02-15,Headphones,Accessories,2,80,Panama City,Cash,160
+ORD-007,2026-03-02,Mouse,Accessories,5,15,David,Transfer,75
+ORD-008,2026-03-08,Monitor,Electronics,1,200,Colon,Card,200
+ORD-009,2026-03-14,Keyboard,Accessories,3,35,Panama City,Cash,105
+ORD-010,2026-03-20,Headphones,Accessories,2,80,David,Card,160
