@@ -1,4 +1,6 @@
+
 import pandas as pd
+
 
 def clean_missing_values(df, strategy="keep"):
     """Handle missing values using the selected strategy."""
@@ -18,14 +20,15 @@ def clean_missing_values(df, strategy="keep"):
 
     return cleaned_df
 
+
 def clean_duplicates(df):
     """Remove exact duplicate rows."""
 
     cleaned_df = df.copy()
-
     cleaned_df = cleaned_df.drop_duplicates()
 
     return cleaned_df
+
 
 def clean_data_types(df):
     """Convert important columns to their expected data types."""
@@ -53,6 +56,7 @@ def clean_data_types(df):
 
     return cleaned_df
 
+
 def clean_business_values(df):
     """Replace invalid business values with missing values."""
 
@@ -78,21 +82,6 @@ def clean_business_values(df):
 
     return cleaned_df
 
-def clean_dataset(df, missing_strategy="keep"):
-    """Apply all cleaning operations to a dataset."""
-
-    cleaned_df = clean_duplicates(df)
-
-    cleaned_df = clean_data_types(cleaned_df)
-
-    cleaned_df = clean_business_values(cleaned_df)
-
-    cleaned_df = clean_missing_values(
-        cleaned_df,
-        strategy=missing_strategy
-    )
-
-    return cleaned_df
 
 def clean_dataset(df, missing_strategy="keep"):
     """Apply all cleaning operations to a dataset."""
@@ -109,3 +98,4 @@ def clean_dataset(df, missing_strategy="keep"):
     )
 
     return cleaned_df
+

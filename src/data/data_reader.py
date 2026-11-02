@@ -15,16 +15,23 @@ def read_csv(file_path):
 def read_excel(file_path):
     """Read an Excel file and return a Pandas DataFrame."""
     return pd.read_excel(file_path)
-    
-def read_file(file_path):
-    """Read a CSV or Excel file based on its extension."""
 
-    if file_path.endswith(".csv"):
+def read_file(file_path):
+    """Read a CSV or Excel file from a path or uploaded file."""
+
+    # Get the filename
+    file_name = getattr(file_path, "name", file_path)
+
+    # Identify the file format
+    file_name = str(file_name).lower()
+
+    if file_name.endswith(".csv"):
         return read_csv(file_path)
 
-    elif file_path.endswith(".xlsx"):
+    elif file_name.endswith(".xlsx"):
         return read_excel(file_path)
 
     else:
-        raise ValueError("Unsupported file format")
-
+        raise ValueError(
+            "Unsupported file format. Use CSV or XLSX."
+        )
