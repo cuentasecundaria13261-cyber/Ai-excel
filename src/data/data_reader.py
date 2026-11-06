@@ -14,7 +14,12 @@ def read_csv(file_path):
 
 def read_excel(file_path):
     """Read an Excel file and return a Pandas DataFrame."""
-    return pd.read_excel(file_path)
+    df = pd.read_excel(file_path)
+
+    if "Date" in df.columns:
+        df["Date"] = pd.to_datetime(df["Date"], errors="coerce")
+
+    return df
 
 def read_file(file_path):
     """Read a CSV or Excel file from a path or uploaded file."""

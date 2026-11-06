@@ -4,6 +4,7 @@ import streamlit as st
 from src.data.data_reader import read_file
 from src.data.data_validator import validate_dataset
 from src.data.data_cleaner import clean_dataset
+from src.ai.insight_generator import generate_business_insights
 
 # Page configuration
 st.set_page_config(
@@ -146,3 +147,147 @@ if uploaded_file is not None:
                 file_name="cleaned_dataset.csv",
                 mime="text/csv"
             )
+
+# AI Business Insights section
+    if "df" in locals():
+        st.divider()
+        st.header("AI Business Insights")
+
+        # AI insights button - only show after data is loaded
+        if st.button("Generate AI Insights", key="generate_ai_insights_btn"):
+            with st.spinner("Generating AI insights..."):
+                try:
+                    analytics = {
+                        "kpis": {
+                            "total_revenue": df["Revenue"].sum() if "Revenue" in df.columns else 0,
+                            "total_orders": df["Order_ID"].nunique() if "Order_ID" in df.columns else 0,
+                            "units_sold": df["Quantity"].sum() if "Quantity" in df.columns else 0,
+                            "average_order_value": (
+                                df["Revenue"].sum() / df["Order_ID"].nunique()
+                                if "Revenue" in df.columns and "Order_ID" in df.columns
+                                else 0
+                            ),
+                        },
+                        "products": {
+                            "revenue_by_product": (
+                                df.groupby("Product")["Revenue"]
+                                .sum()
+                                .to_dict()
+                                if "Product" in df.columns and "Revenue" in df.columns
+                                else {}
+                            ),
+                            "units_sold_by_product": (
+                                df.groupby("Product")["Quantity"]
+                                .sum()
+                                .to_dict()
+                                if "Product" in df.columns and "Quantity" in df.columns
+                                else {}
+                            ),
+                            "revenue_by_category": (
+                                df.groupby("Category")["Revenue"]
+                                .sum()
+                                .to_dict()
+                                if "Category" in df.columns and "Revenue" in df.columns
+                                else {}
+                            ),
+                        },
+                        "time": {
+                            "revenue_by_month": (
+                                df.groupby(df["Date"].dt.month)["Revenue"]
+                                .sum()
+                                .to_dict()
+                                if "Date" in df.columns and "Revenue" in df.columns
+                                else {}
+                            ),
+                            "revenue_by_day": (
+                                df.groupby(df["Date"].dt.day)["Revenue"]
+                                .sum()
+                                .to_dict()
+                                if "Date" in df.columns and "Revenue" in df.columns
+                                else {}
+                            ),
+                            "revenue_by_year": (
+                                df.groupby(df["Date"].dt.year)["Revenue"]
+                                .sum()
+                                .to_dict()
+                                if "Date" in df.columns and "Revenue" in df.columns
+                                else {}
+                            ),
+                        },
+                        "regions": {
+                            "revenue_by_region": (
+                                df.groupby("Region")["Revenue"]
+                                .sum()
+                                .to_dict()
+                                if "Region" in df.columns and "Revenue" in df.columns
+                                else {}
+                            ),
+                            "orders_by_region": (
+                                df.groupby("Region")["Order_ID"]
+                                .nunique()
+                                .to_dict()
+                                if "Region" in df.columns and "Order_ID" in df.columns
+                                else {}
+                            ),
+                            "average_order_value_by_region": (
+                                df.groupby("Region")
+                                .apply(
+                                    lambda x: x["Revenue"].sum() / x["Order_ID"].nunique()
+                                    if "Revenue" in x.columns and "Order_ID" in x.columns
+                                    else 0
+                                )
+                                .to_dict()
+                                if "Region" in df.columns and "Revenue" in df.columns and "Order_ID" in df.columns
+                                else {}
+                            ),
+                        },
+                    }
+
+                    result = generate_business_insights(analytics)
+
+                    if result["structure_valid"]:
+                        insights = result["insights"]
+
+                        # Executive summary
+                        st.subheader("Executive summary")
+                        st.write(insights["summary"]["text"])
+
+                        # Key observations
+                        st.subheader("Key observations")
+                        if insights["observations"]:
+                            for obs in insights["observations"]:
+                                st.markdown(f"- **{obs['title']}**: {obs['explanation']}")
+                        else:
+                            st.write("No significant observations identified.")
+
+                        # Business recommendations
+                        st.subheader("Business recommendations")
+                        if insights["recommendations"]:
+                            for rec in insights["recommendations"]:
+                                st.markdown(f"- **Action**: {rec['action']}")
+                                st.caption(f"Rationale: {rec['rationale']}")
+                                st.caption(f"Evidence: {', '.join(rec['evidence'])}")
+                                st.caption(f"Caveat: {rec['caveat']}")
+                        else:
+                            st.write("No recommendations at this time.")
+
+                        # Data quality interpretation
+                        st.subheader("Data quality interpretation")
+                        if insights.get("data_quality_interpretation"):
+                            for dqi in insights["data_quality_interpretation"]:
+                                st.markdown(f"- **{dqi['title']}**: {dqi['explanation']}")
+                        else:
+                            st.write("No data quality issues identified.")
+
+                        # Further analysis opportunities
+                        st.subheader("Further analysis opportunities")
+                        st.write(
+                            "- What are the profit margins by product?"
+                            "- Which customers make repeat purchases?"
+                            "- How do discounts affect revenue?"
+                        )
+                    else:
+                        st.error("Failed to generate AI insights. Please try again.")
+
+                except Exception as e:
+                    st.error(f"Error generating AI insights: {e}")
