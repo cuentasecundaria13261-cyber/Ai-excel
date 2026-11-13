@@ -8,7 +8,7 @@ from src.ai.ai_service import generate_response
 from src.ai.insight_validator import validate_insight_payload
 
 
-def generate_business_insights(analytics):
+def generate_business_insights(analytics, strict_mode=True):
     """
     Generate structured AI interpretations and validate their structure
     and evidence references against calculated analytics.
@@ -34,7 +34,8 @@ def generate_business_insights(analytics):
 
     issues = validate_insight_payload(
         payload,
-        known_fact_ids
+        known_fact_ids,
+        strict_mode=strict_mode
     )
 
     return {
