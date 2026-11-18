@@ -1,14 +1,14 @@
 def validate_insight_payload(payload, known_fact_ids, strict_mode=True):
     """Validate the structure and evidence references in an AI response.
- 
+
     strict_mode is kept for compatibility; numbers in text are now allowed.
     """
- 
+
     issues = []
- 
+
     if not isinstance(payload, dict):
         return ["The AI response must be a JSON object."]
- 
+
     # Validate executive_summary
     if "executive_summary" not in payload:
         issues.append("Missing required section: executive_summary")
@@ -29,7 +29,7 @@ def validate_insight_payload(payload, known_fact_ids, strict_mode=True):
                 for fid in es["evidence"]:
                     if not isinstance(fid, str) or fid not in known_fact_ids:
                         issues.append(f"executive_summary.evidence references unknown fact ID: {fid}.")
- 
+
     # Validate key_performance_observations
     observations = payload.get("key_performance_observations", [])
     if not isinstance(observations, list):
@@ -54,7 +54,7 @@ def validate_insight_payload(payload, known_fact_ids, strict_mode=True):
                 for fid in obs["evidence"]:
                     if not isinstance(fid, str) or fid not in known_fact_ids:
                         issues.append(f"key_performance_observations[{i}].evidence references unknown fact ID: {fid}.")
- 
+
     # Validate business_recommendations
     recommendations = payload.get("business_recommendations", [])
     if not isinstance(recommendations, list):
@@ -78,7 +78,7 @@ def validate_insight_payload(payload, known_fact_ids, strict_mode=True):
                 for fid in rec["evidence"]:
                     if not isinstance(fid, str) or fid not in known_fact_ids:
                         issues.append(f"business_recommendations[{i}].evidence references unknown fact ID: {fid}.")
- 
+
     # Validate data_quality_interpretation
     dqi = payload.get("data_quality_interpretation", [])
     if not isinstance(dqi, list):
@@ -103,7 +103,7 @@ def validate_insight_payload(payload, known_fact_ids, strict_mode=True):
                 for fid in item["evidence"]:
                     if not isinstance(fid, str) or fid not in known_fact_ids:
                         issues.append(f"data_quality_interpretation[{i}].evidence references unknown fact ID: {fid}.")
- 
+
     # Validate further_analysis_opportunities
     fao = payload.get("further_analysis_opportunities", [])
     if not isinstance(fao, list):
@@ -122,5 +122,5 @@ def validate_insight_payload(payload, known_fact_ids, strict_mode=True):
                 issues.append(f"further_analysis_opportunities[{i}].question must be a non-empty string.")
             if not isinstance(item.get("additional_data_required"), str) or not item["additional_data_required"].strip():
                 issues.append(f"further_analysis_opportunities[{i}].additional_data_required must be a non-empty string.")
- 
+
     return issues

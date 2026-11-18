@@ -1,9 +1,16 @@
-# Python cache files
-__pycache__/
-*.py[cod]
-
-# Virtual environment
+# virtual environments and caches
 .venv/
+venv/
+__pycache__/
+*.pyc
+.pytest_cache/
 
-# Environment variables
+# secrets: never commit these
 .env
+.streamlit/secrets.toml
+
+# editor and system files
+.vscode/
+.idea/
+.DS_Store
+*.log

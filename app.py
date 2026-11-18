@@ -1,53 +1,95 @@
 
 import streamlit as st
- 
+
 from src.data.data_reader import read_file
 from src.data.data_validator import validate_dataset
 from src.data.data_cleaner import clean_dataset
 from src.ai.insight_generator import generate_business_insights
- 
+from src.ai.ai_service import ai_status
+from src.ai.ai_notice import render_ai_unavailable
+from src.security.upload_guard import (
+    check_file_bytes,
+    check_frame,
+    check_sheet_size,
+    to_safe_csv_bytes,
+)
+
+
+def _md(text):
+    """Escape '$' so Streamlit does not render money amounts as math."""
+    return str(text).replace("$", "\\$")
+
+
 # Page configuration
 st.set_page_config(
     page_title="AI Excel Dashboard",
     page_icon="📊",
     layout="wide"
 )
- 
+
+# Sidebar navigation
+st.sidebar.title("Navigation")
+page = st.sidebar.radio(
+    "Choose a dashboard",
+    ["Business Dashboard", "Generic Dashboard", "Business (classic)"],
+    key="main_navigation",
+)
+
+st.sidebar.caption("Free test version. Files are processed in memory and not saved by this app.")
+
+if page == "Business Dashboard":
+    st.sidebar.info("Upload your sales file and get a plain-language summary, alerts and charts")
+
+    from src.business.business_dashboard import render_business_dashboard
+
+    render_business_dashboard()
+    st.stop()
+
+if page == "Generic Dashboard":
+    st.sidebar.info("Analyze any Excel or CSV dataset, whatever its columns are")
+
+    from src.generic.generic_dashboard import render_generic_dashboard
+
+    render_generic_dashboard()
+    st.stop()
+
+st.sidebar.info("The original business dashboard (fixed column names)")
+
 # Dashboard title
 st.title("AI Excel Dashboard")
- 
+
 st.write(
     "Upload your Excel or CSV files "
     "to analyze your business data."
 )
- 
-# Sidebar
-st.sidebar.title("Navigation")
-st.sidebar.info("Your business analytics dashboard")
- 
+
 # File uploader
 st.header("Upload your dataset")
- 
+
 uploaded_file = st.file_uploader(
     "Choose an Excel or CSV file",
     type=["csv", "xlsx"],
     key="main_dataset_uploader"
 )
- 
+
 # Read uploaded file
 if uploaded_file is not None:
- 
+
     try:
+        _data = uploaded_file.getvalue()
+        check_file_bytes(_data, uploaded_file.name)
+        check_sheet_size(_data, uploaded_file.name)
         df = read_file(uploaded_file)
- 
+        check_frame(df)
+
         st.success("File uploaded and read successfully!")
         st.dataframe(df)
- 
+
         # Data validation
         st.subheader("Data Validation")
- 
+
         validation_report = validate_dataset(df)
- 
+
         # Missing columns
         if validation_report["missing_columns"]:
             st.error(
@@ -55,23 +97,23 @@ if uploaded_file is not None:
             )
         else:
             st.success("All required columns are present.")
- 
+
         # Missing values
         if not validation_report["missing_values"].empty:
             st.warning("Missing values detected:")
             st.write(validation_report["missing_values"])
         else:
             st.success("No missing values detected.")
- 
+
         # Duplicate orders
         duplicates = validation_report["duplicate_orders"]
- 
+
         if duplicates is not None and not duplicates.empty:
             st.warning("Duplicate orders detected:")
             st.dataframe(duplicates)
         else:
             st.success("No duplicate orders detected.")
- 
+
         # Invalid data types
         if validation_report["invalid_data_types"]:
             st.warning(
@@ -79,7 +121,7 @@ if uploaded_file is not None:
             )
         else:
             st.success("All data types are valid.")
- 
+
         # Invalid business values
         for check_name, invalid_rows in validation_report[
             "invalid_business_values"
@@ -89,23 +131,23 @@ if uploaded_file is not None:
                 st.dataframe(invalid_rows)
             else:
                 st.success(f"{check_name}: No problems detected.")
- 
+
     except Exception as e:
         st.error(f"Error reading or validating file: {e}")
- 
+
     # Dataset information
     if "df" in locals():
         col1, col2 = st.columns(2)
- 
+
         with col1:
             st.metric("Total Rows", len(df))
- 
+
         with col2:
             st.metric("Total Columns", len(df.columns))
- 
+
         # Data cleaning
         st.subheader("Data Cleaning")
- 
+
         missing_strategy = st.selectbox(
             "How should missing values be handled?",
             options=["keep", "drop"],
@@ -114,47 +156,51 @@ if uploaded_file is not None:
                 else "Drop rows with missing values"
             )
         )
- 
+
         if st.button("Clean Dataset"):
             cleaned_df = clean_dataset(
                 df,
                 missing_strategy=missing_strategy
             )
- 
+
             st.session_state["cleaned_df"] = cleaned_df
- 
+
         if "cleaned_df" in st.session_state:
             cleaned_df = st.session_state["cleaned_df"]
- 
+
             st.success("Dataset cleaning completed!")
- 
+
             col1, col2 = st.columns(2)
- 
+
             with col1:
                 st.metric("Original Rows", len(df))
- 
+
             with col2:
                 st.metric("Cleaned Rows", len(cleaned_df))
- 
+
             st.subheader("Cleaned Dataset Preview")
             st.dataframe(cleaned_df)
- 
-            csv_data = cleaned_df.to_csv(index=False).encode("utf-8")
- 
+
+            csv_data = to_safe_csv_bytes(cleaned_df)
+
             st.download_button(
                 label="Download Cleaned CSV",
                 data=csv_data,
                 file_name="cleaned_dataset.csv",
                 mime="text/csv"
             )
- 
+
 # AI Business Insights section
     if "df" in locals():
         st.divider()
         st.header("AI Business Insights")
- 
-        # AI insights button - only show after data is loaded
-        if st.button("Generate AI Insights", key="generate_ai_insights_btn"):
+
+        # AI insights button - only shown when the local AI (Ollama) is available
+        ai_ready = ai_status()
+        if not ai_ready["available"]:
+            render_ai_unavailable(ai_ready)
+
+        if ai_ready["available"] and st.button("Generate AI Insights", key="generate_ai_insights_btn"):
             with st.spinner("Generating AI insights..."):
                 try:
                     analytics = {
@@ -242,73 +288,73 @@ if uploaded_file is not None:
                             ),
                         },
                     }
- 
+
                     result = generate_business_insights(analytics)
                     insights = result["insights"]
- 
+
                     # Show validation problems instead of hiding the whole report
                     if not result["structure_valid"]:
                         st.warning("The AI response had some issues, but it is shown below.")
                         with st.expander("Validation issues"):
                             for issue in result["validation_issues"]:
                                 st.write(f"- {issue}")
- 
+
                     if not isinstance(insights, dict):
                         st.error("The AI did not return a usable report. Please try again.")
                     else:
                         # Executive summary
                         st.subheader("Executive summary")
                         es = insights.get("executive_summary")
-                        st.write(es.get("text", "") if isinstance(es, dict) else "No summary generated.")
- 
+                        st.write(_md(es.get("text", "")) if isinstance(es, dict) else "No summary generated.")
+
                         # Key observations
                         st.subheader("Key observations")
                         observations = insights.get("key_performance_observations", [])
                         if observations:
                             for obs in observations:
-                                st.markdown(f"- **{obs.get('category', '')}**: {obs.get('analysis', '')}")
+                                st.markdown(f"- **{_md(obs.get('category', ''))}**: {_md(obs.get('analysis', ''))}")
                         else:
                             st.write("No significant observations identified.")
- 
+
                         # Business recommendations
                         st.subheader("Business recommendations")
                         recommendations = insights.get("business_recommendations", [])
                         if recommendations:
                             for rec in recommendations:
-                                st.markdown(f"- **Action**: {rec.get('action', '')}")
-                                st.caption(f"Reason: {rec.get('reason', '')}")
+                                st.markdown(f"- **Action**: {_md(rec.get('action', ''))}")
+                                st.caption(f"Reason: {_md(rec.get('reason', ''))}")
                                 st.caption(f"Evidence: {', '.join(rec.get('evidence', []))}")
-                                st.caption(f"Caveat: {rec.get('caveat', '')}")
+                                st.caption(f"Caveat: {_md(rec.get('caveat', ''))}")
                         else:
                             st.write("No recommendations at this time.")
- 
+
                         # Data quality interpretation
                         st.subheader("Data quality interpretation")
                         dqi_items = insights.get("data_quality_interpretation", [])
                         if dqi_items:
                             for dqi in dqi_items:
-                                st.markdown(f"- **{dqi.get('title', '')}**: {dqi.get('explanation', '')}")
+                                st.markdown(f"- **{_md(dqi.get('title', ''))}**: {_md(dqi.get('explanation', ''))}")
                         else:
                             st.write("No data quality issues identified.")
- 
+
                         # Further analysis opportunities
                         st.subheader("Further analysis opportunities")
                         fao = insights.get("further_analysis_opportunities", [])
                         if fao:
                             for item in fao:
                                 st.markdown(
-                                    f"- **{item.get('question', '')}** "
-                                    f"(needs: {item.get('additional_data_required', '')})"
+                                    f"- **{_md(item.get('question', ''))}** "
+                                    f"(needs: {_md(item.get('additional_data_required', ''))})"
                                 )
                         else:
                             st.write("No further analysis suggestions.")
- 
+
                         # Limitations
                         limitations = insights.get("analysis_limitations", [])
                         if limitations:
                             st.subheader("Analysis limitations")
                             for limitation in limitations:
-                                st.markdown(f"- {limitation}")
- 
+                                st.markdown(f"- {_md(limitation)}")
+
                 except Exception as e:
                     st.error(f"Error generating AI insights: {e}")

@@ -1,0 +1,6 @@
+[server]
+# Largest file a visitor can upload, in megabytes.
+maxUploadSize = 25
+
+[browser]
+gatherUsageStats = false
