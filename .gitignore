@@ -17,3 +17,4 @@ __pycache__/
 
 # feedback saved on the server when no webhook is set
 feedback_data/
+*:Zone.Identifier
