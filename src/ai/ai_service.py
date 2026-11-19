@@ -5,6 +5,9 @@ import time
 import urllib.error
 import urllib.request
 
+from src.ai import hosted_guard
+from src.ai.ai_settings import get_setting
+
 # The AI runs on the computer where Ollama is installed. These can be changed
 # without editing code by setting environment variables before starting the app:
 #   OLLAMA_URL    (default http://localhost:11434)
@@ -15,16 +18,47 @@ MODEL_NAME = os.environ.get("OLLAMA_MODEL", "qwen3:1.7b")
 CHAT_URL = f"{OLLAMA_BASE_URL}/api/chat"
 TAGS_URL = f"{OLLAMA_BASE_URL}/api/tags"
 
+# Online fallback, used only when Ollama is not available (for example on the public website).
+# The key is read from Streamlit Secrets or an environment variable, never from the code:
+#   GROQ_API_KEY  (required to turn the online AI on)
+#   GROQ_MODEL    (default below)
+GROQ_URL = "https://api.groq.com/openai/v1/chat/completions"
+GROQ_DEFAULT_MODEL = "openai/gpt-oss-120b"
+GROQ_TIMEOUT = 60
+GROQ_MAX_PROMPT_CHARS = 20_000
+GROQ_MAX_OUTPUT_TOKENS = 1500
+
 _STATUS_TTL_SECONDS = 15
 _status_cache = {"time": 0.0, "value": None}
 
 
+def hosted_enabled():
+    """True when an online AI key has been set up by the owner."""
+    return bool(get_setting("GROQ_API_KEY"))
+
+
+def hosted_model():
+    return get_setting("GROQ_MODEL") or GROQ_DEFAULT_MODEL
+
+
 def ai_status(timeout=1.5, use_cache=True):
-    """Check whether the local AI can be used. Never raises.
+    """Which AI can be used. Never raises.
 
     Returns {"available": bool, "reason": "ok" | "not_running" | "model_missing",
-             "model": str}.
+             "model": str, "provider": "ollama" | "groq" | None}.
+    Ollama on this computer is preferred (the data stays here). The online AI is only
+    used when Ollama is not available and the owner has set a key.
     """
+    local = _ollama_status(timeout=timeout, use_cache=use_cache)
+    if local["available"]:
+        return {**local, "provider": "ollama"}
+    if hosted_enabled():
+        return {"available": True, "reason": "ok", "model": hosted_model(), "provider": "groq"}
+    return {**local, "provider": None}
+
+
+def _ollama_status(timeout=1.5, use_cache=True):
+    """Check whether the local AI (Ollama) can be used."""
     now = time.monotonic()
     if use_cache and _status_cache["value"] is not None and now - _status_cache["time"] < _STATUS_TTL_SECONDS:
         return _status_cache["value"]
@@ -50,6 +84,69 @@ def ai_status(timeout=1.5, use_cache=True):
 
 
 def generate_response(prompt, timeout=600):
+    """Send the prompt to the available AI and return its JSON-formatted answer."""
+    if ai_status()["provider"] == "groq":
+        return _groq_response(prompt, min(timeout, GROQ_TIMEOUT))
+    return _ollama_response(prompt, timeout)
+
+
+def _groq_response(prompt, timeout=GROQ_TIMEOUT):
+    """Ask the online AI. Counts against the daily, session and burst limits."""
+    key = get_setting("GROQ_API_KEY")
+    model = hosted_model()
+    if len(prompt) > GROQ_MAX_PROMPT_CHARS:
+        raise RuntimeError("This dataset summary is too large for the free online AI. Try filtering the data first.")
+
+    hosted_guard.reserve()   # raises AiLimitReached with a visitor-friendly message
+
+    body = {
+        "model": model,
+        "messages": [{"role": "user", "content": prompt}],
+        "temperature": 0.2,
+        "response_format": {"type": "json_object"},
+        "max_completion_tokens": GROQ_MAX_OUTPUT_TOKENS,
+    }
+    if model.startswith("openai/gpt-oss"):
+        body["reasoning_effort"] = "low"   # short answers, fewer tokens used
+
+    def send(payload):
+        request = urllib.request.Request(
+            GROQ_URL,
+            data=json.dumps(payload).encode("utf-8"),
+            headers={
+                "Content-Type": "application/json",
+                "Authorization": f"Bearer {key}",
+                "User-Agent": "ai-excel-dashboard/1.0",
+            },
+            method="POST",
+        )
+        with urllib.request.urlopen(request, timeout=timeout) as response:
+            return json.loads(response.read().decode("utf-8"))
+
+    try:
+        try:
+            data = send(body)
+        except urllib.error.HTTPError as error:
+            if error.code != 400 or "reasoning_effort" not in body:
+                raise
+            body.pop("reasoning_effort")      # a model that does not know this option
+            data = send(body)
+        return data["choices"][0]["message"]["content"]
+    except urllib.error.HTTPError as error:
+        # The service did answer, so the request counts. Never show the key or raw details.
+        if error.code in (401, 403):
+            raise RuntimeError("The online AI rejected the app's key. The owner needs to check it.") from error
+        if error.code == 429:
+            raise RuntimeError("The free online AI is busy or its limit was reached. Please try again in a minute.") from error
+        raise RuntimeError(f"The online AI returned an error (HTTP {error.code}). Please try again.") from error
+    except (urllib.error.URLError, TimeoutError, socket.timeout) as error:
+        hosted_guard.release()
+        raise RuntimeError("Could not reach the online AI. Please try again in a moment.") from error
+    except (KeyError, IndexError, TypeError, ValueError) as error:
+        raise RuntimeError("The online AI sent an answer the app could not read. Please try again.") from error
+
+
+def _ollama_response(prompt, timeout=600):
     """Send the prompt to Ollama and return the JSON-formatted AI response."""
     payload = {
         "model": MODEL_NAME,

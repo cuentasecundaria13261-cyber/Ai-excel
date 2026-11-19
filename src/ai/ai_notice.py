@@ -2,6 +2,8 @@
 
 import streamlit as st
 
+from src.ai import hosted_guard
+
 
 def render_ai_unavailable(status):
     """Explain, in plain words, why there is no AI button and how to get one."""
@@ -32,3 +34,33 @@ def render_ai_unavailable(status):
         st.caption(
             "Your files then stay on your computer, and the AI button appears automatically."
         )
+
+
+def ai_gate(status, key):
+    """Before the AI button: when the online AI is used, ask for consent and show what is left.
+
+    Returns True when the button may be shown. With the local AI (Ollama) it always returns True.
+    """
+    if status.get("provider") != "groq":
+        return True
+
+    st.info(
+        "**AI explanations on this website use a free online AI service (Groq).** "
+        "If you continue, a summary is sent there: the totals, the names of groups such as products "
+        "or regions, the alerts, and anything you type in the boxes above. "
+        "Your file itself is not sent. Do not type personal data."
+    )
+    left = hosted_guard.remaining()
+    if left["daily_left"] <= 0:
+        st.warning("The free AI allowance for today has been used up. It starts again tomorrow.")
+        return False
+    if left["session_left"] <= 0:
+        st.warning("You have used all the AI requests for this visit. Reload the page later to try again.")
+        return False
+
+    agreed = st.checkbox(
+        "I understand, and I agree to send this summary to the online AI",
+        key=f"ai_consent_{key}",
+    )
+    st.caption(f"AI requests left in this visit: {left['session_left']}")
+    return bool(agreed)

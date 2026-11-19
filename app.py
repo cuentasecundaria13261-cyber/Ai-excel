@@ -6,7 +6,8 @@ from src.data.data_validator import validate_dataset
 from src.data.data_cleaner import clean_dataset
 from src.ai.insight_generator import generate_business_insights
 from src.ai.ai_service import ai_status
-from src.ai.ai_notice import render_ai_unavailable
+from src.ai.ai_notice import ai_gate, render_ai_unavailable
+from src.feedback.feedback_ui import render_feedback
 from src.security.upload_guard import (
     check_file_bytes,
     check_frame,
@@ -36,6 +37,9 @@ page = st.sidebar.radio(
 )
 
 st.sidebar.caption("Free test version. Files are processed in memory and not saved by this app.")
+
+with st.sidebar:
+    render_feedback(page)
 
 if page == "Business Dashboard":
     st.sidebar.info("Upload your sales file and get a plain-language summary, alerts and charts")
@@ -200,7 +204,7 @@ if uploaded_file is not None:
         if not ai_ready["available"]:
             render_ai_unavailable(ai_ready)
 
-        if ai_ready["available"] and st.button("Generate AI Insights", key="generate_ai_insights_btn"):
+        if ai_ready["available"] and ai_gate(ai_ready, "classic") and st.button("Generate AI Insights", key="generate_ai_insights_btn"):
             with st.spinner("Generating AI insights..."):
                 try:
                     analytics = {

@@ -14,3 +14,6 @@ __pycache__/
 .idea/
 .DS_Store
 *.log
+
+# feedback saved on the server when no webhook is set
+feedback_data/

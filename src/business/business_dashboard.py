@@ -8,12 +8,13 @@ optional AI explanation and a report you can download.
 import pandas as pd
 import streamlit as st
 
-from src.ai.ai_notice import render_ai_unavailable
+from src.ai.ai_notice import ai_gate, render_ai_unavailable
 from src.ai.ai_service import ai_status
 from src.business import business_engine as be
 from src.business import business_report as br
 from src.business.sample_data import sample_upload
 from src.generic import generic_analysis as ga
+from src.generic.cached_io import clean_cached, read_cached
 from src.generic.generic_dashboard import render_insights
 from src.generic.generic_insights import generate_generic_insights
 from src.security import upload_guard as ug
@@ -59,7 +60,7 @@ def _read_uploads(uploads):
                 if len(sheets) > 1:
                     notes.append(f"{upload.name}: used the first sheet ('{sheet}').")
 
-        frames.append(ga.read_any_file(data, upload.name, sheet_name=sheet))
+        frames.append(read_cached(data, upload.name, sheet))
 
     if len(frames) == 1:
         return frames[0], notes, "|".join(file_parts)
@@ -132,7 +133,11 @@ def render_business_dashboard():
         st.warning("The file was read, but it has no data rows.")
         return
 
-    cleaned, clean_report = ga.clean_dataset(
+    large_note = ug.large_file_note(len(raw_df))
+    if large_note:
+        st.info(large_note)
+
+    cleaned, clean_report = clean_cached(
         raw_df,
         remove_duplicates=False,   # duplicates are handled once the order number is known
         convert_numbers=True,
@@ -337,7 +342,7 @@ def render_business_dashboard():
 
     settings_key = str((file_sig, sorted((k, str(v)) for k, v in mapping.items()), filters_text))
 
-    if status["available"] and st.button("Explain with AI", key="business_ai_btn"):
+    if status["available"] and ai_gate(status, "business") and st.button("Explain with AI", key="business_ai_btn"):
         with st.spinner("The AI is reading your numbers..."):
             try:
                 analytics = be.build_ai_analytics(work, periods, comparison, alerts, metric_label)

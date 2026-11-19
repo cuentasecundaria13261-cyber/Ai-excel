@@ -30,8 +30,9 @@ def _env_int(name, default):
 # Limits for the free demo. Change them with environment variables if needed.
 MAX_FILE_MB = _env_int("MAX_FILE_MB", 25)
 MAX_UNCOMPRESSED_MB = _env_int("MAX_UNCOMPRESSED_MB", 200)
-MAX_ROWS = _env_int("MAX_ROWS", 100_000)
-MAX_COLUMNS = _env_int("MAX_COLUMNS", 100)
+MAX_ROWS = _env_int("MAX_ROWS", 250_000)
+MAX_COLUMNS = _env_int("MAX_COLUMNS", 200)
+LARGE_ROWS = _env_int("LARGE_ROWS", 100_000)   # above this, show a "may be slow" notice
 MAX_ZIP_ENTRIES = 2000
 
 _MB = 1024 * 1024
@@ -139,6 +140,16 @@ def check_frame(df, max_rows=None, max_columns=None):
         raise UploadRejected(
             f"This file has {df.shape[1]:,} columns. The free test version handles up to {max_columns} columns."
         )
+
+
+def large_file_note(rows):
+    """A friendly warning for big (but allowed) tables, or None."""
+    if rows > LARGE_ROWS:
+        return (
+            f"This is a large file ({rows:,} rows). Everything still works, but it may take a few "
+            "seconds to load and to react when you change something."
+        )
+    return None
 
 
 # --------------------------------------------------------------------------

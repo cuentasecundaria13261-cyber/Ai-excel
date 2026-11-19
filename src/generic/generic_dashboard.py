@@ -3,7 +3,7 @@
 import pandas as pd
 import streamlit as st
 
-from src.ai.ai_notice import render_ai_unavailable
+from src.ai.ai_notice import ai_gate, render_ai_unavailable
 from src.ai.ai_service import ai_status
 from src.ai.prompt_builder import convert_to_json_safe
 from src.business.sample_data import sample_upload
@@ -15,13 +15,12 @@ from src.generic.generic_analysis import (
     aggregate_by_group,
     aggregate_by_period,
     build_generic_analytics,
-    clean_dataset,
     infer_column_roles,
     list_sheets,
-    read_any_file,
     suggest_main_date,
     suggest_main_measure,
 )
+from src.generic.cached_io import clean_cached, read_cached
 from src.generic.generic_insights import generate_generic_insights
 
 
@@ -182,7 +181,7 @@ def render_generic_dashboard():
         ) - 1
 
     try:
-        raw_df = read_any_file(file_bytes, uploaded.name, sheet_name, header_row)
+        raw_df = read_cached(file_bytes, uploaded.name, sheet_name, header_row)
     except Exception as error:
         st.error(f"Could not read the file: {error}")
         return
@@ -192,6 +191,9 @@ def render_generic_dashboard():
         return
 
     st.success("File uploaded and read successfully!")
+    large_note = ug.large_file_note(len(raw_df))
+    if large_note:
+        st.info(large_note)
     st.dataframe(raw_df.head(100))
 
     # ---- 2. Clean
@@ -231,7 +233,7 @@ def render_generic_dashboard():
             key=f"generic_dateorder_{file_id}",
         )
 
-    cleaned_df, report = clean_dataset(
+    cleaned_df, report = clean_cached(
         raw_df,
         remove_duplicates=remove_duplicates,
         convert_numbers=convert_numbers,
@@ -413,7 +415,7 @@ def render_generic_dashboard():
     else:
         render_ai_unavailable(status)
 
-    if status["available"] and st.button("Generate AI Insights", key="generic_generate_ai_btn"):
+    if status["available"] and ai_gate(status, "generic") and st.button("Generate AI Insights", key="generic_generate_ai_btn"):
         with st.spinner("Generating AI insights..."):
             try:
                 result = generate_generic_insights(analytics, goal=goal, description=description)

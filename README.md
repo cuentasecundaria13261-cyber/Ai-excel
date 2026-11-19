@@ -64,7 +64,8 @@ If the deploy log shows `ModuleNotFoundError: No module named 'xyz'`, add `xyz` 
 - Columns that look like personal data (emails, phones, addresses, ID numbers, people's
   names) are flagged and, by default, removed before analysis. Please do not upload
   personal data.
-- Limits protect the free server: files up to 25 MB, up to 100,000 rows and 200 columns.
+- Limits protect the free server: files up to 25 MB, up to 250,000 rows and 200 columns (a notice appears above 100,000 rows). Change them with the `MAX_ROWS` and `MAX_COLUMNS` environment variables, in one place: `src/security/upload_guard.py`.
+- Reading and tidying a file is cached for 15 minutes, so clicking around does not redo the slow steps.
   Excel files that unpack to something huge are refused. Change the upload size in
   `.streamlit/config.toml`.
 - Downloaded CSV files are made safe for Excel: text that would run as a formula
@@ -88,7 +89,26 @@ src/data/                   reading, validating and cleaning for the classic pag
 .streamlit/config.toml      upload size limit
 requirements.txt            packages to install
 ```
-# Ai-excel
-# Ai-excel
-# Ai-excel
-# Ai-excel
+
+## Feedback
+
+The sidebar has a "Send feedback" box. Where answers go:
+
+1. **Best for the public site:** set `FEEDBACK_WEBHOOK_URL` (an https address, for example a free Google Apps Script or Formspree form) in Streamlit Cloud under Settings > Secrets:
+   ```toml
+   FEEDBACK_WEBHOOK_URL = "https://..."
+   FEEDBACK_ISSUES_URL = "https://github.com/YOUR_USER/YOUR_REPO/issues"   # optional link
+   ```
+2. With no webhook, answers are appended to `feedback_data/feedback.jsonl` on the server. On the free Streamlit host this file is erased when the app restarts, so use option 1 there.
+
+Only what the visitor types in the box is saved, never their uploaded data.
+
+## AI on the public website (free online AI)
+
+On your own computer the AI runs with Ollama and nothing leaves your machine. On the public site there is no Ollama, so the app can use a free online AI (Groq) instead, but only if you set a key:
+
+1. Create a free account and an API key at console.groq.com. In its Data Controls you can turn on Zero Data Retention.
+2. In Streamlit Cloud open your app > Settings > Secrets and add `GROQ_API_KEY = "..."` (see `.streamlit/secrets.toml.example`). Never put the key in the code or in GitHub.
+3. Check your limits in the Groq console (Settings > Limits). Set `GROQ_DAILY_CAP` below your daily allowance. The default is 45 requests a day, 4 per visitor visit, and at most 2 per minute for the whole app. One AI report can use up to 2 requests.
+
+Rules the app follows: Ollama is always used first when it is running; visitors must tick a box agreeing that a summary (totals, group names, alerts and any text they typed, never the file) is sent to the online AI; when a limit is reached the AI button is replaced by a friendly message and the rest of the app keeps working. The daily counter is kept in the server's memory, so it starts again from zero if the app restarts.

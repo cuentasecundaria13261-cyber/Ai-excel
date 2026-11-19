@@ -12,11 +12,15 @@ import zipfile
 
 import pandas as pd
 
+from src.security import upload_guard as _guard
+
 ROLES = ["measure", "dimension", "date", "id", "text", "ignore"]
 
 # Limits that keep a free, shared test server from running out of memory.
-MAX_ROWS = 100_000
-MAX_COLUMNS = 200
+# One place decides the numbers: src/security/upload_guard.py (or the MAX_ROWS /
+# MAX_COLUMNS environment variables), so every page and check agrees.
+MAX_ROWS = _guard.MAX_ROWS
+MAX_COLUMNS = _guard.MAX_COLUMNS
 MAX_UNCOMPRESSED_BYTES = 200 * 1024 * 1024   # size of an Excel file once unpacked
 _MAX_PACK_RATIO = 200                        # unpacked / packed, for big files only
 
