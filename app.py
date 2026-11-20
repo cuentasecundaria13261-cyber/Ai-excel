@@ -1,4 +1,6 @@
 
+import os
+
 import streamlit as st
 
 from src.data.data_reader import read_file
@@ -9,6 +11,7 @@ from src.ai.ai_service import ai_status
 from src.ai.ai_notice import ai_gate, render_ai_unavailable
 from src.feedback.feedback_ui import render_feedback
 from src.i18n import LANGUAGES, detect_browser_language, t
+from src.ui.style import apply_style
 from src.security.upload_guard import (
     check_file_bytes,
     check_frame,
@@ -29,6 +32,8 @@ st.set_page_config(
     layout="wide"
 )
 
+apply_style()
+
 # Language: starts from the browser's language, and the visitor can change it.
 if "lang" not in st.session_state:
     st.session_state["lang"] = detect_browser_language()
@@ -40,37 +45,47 @@ st.sidebar.radio(
     horizontal=True,
 )
 
-# Sidebar navigation
-st.sidebar.title(t("Navigation"))
+# Sidebar navigation: two clear choices. The old classic page is only shown when SHOW_CLASSIC=1.
+_PAGES = {
+    "Business Dashboard": "Sales analysis",
+    "Generic Dashboard": "Any other data",
+    "Business (classic)": "Business (classic)",
+}
+_options = ["Business Dashboard", "Generic Dashboard"]
+if os.environ.get("SHOW_CLASSIC") == "1":
+    _options.append("Business (classic)")
+
 page = st.sidebar.radio(
     t("Choose a dashboard"),
-    ["Business Dashboard", "Generic Dashboard", "Business (classic)"],
-    format_func=t,
+    _options,
+    format_func=lambda value: t(_PAGES[value]),
     key="main_navigation",
+    label_visibility="collapsed",
 )
-
+_PAGE_HELP = {
+    "Business Dashboard": "For sales files: dates, products and money. Everything is detected for you.",
+    "Generic Dashboard": "For any other table. The app works out what each column is.",
+    "Business (classic)": "The original business dashboard (fixed column names)",
+}
+st.sidebar.caption(t(_PAGE_HELP[page]))
+st.sidebar.divider()
 st.sidebar.caption(t("Free test version. Files are processed in memory and not saved by this app."))
 
 with st.sidebar:
     render_feedback(page)
 
 if page == "Business Dashboard":
-    st.sidebar.info(t("Upload your sales file and get a plain-language summary, alerts and charts"))
-
     from src.business.business_dashboard import render_business_dashboard
 
     render_business_dashboard()
     st.stop()
 
 if page == "Generic Dashboard":
-    st.sidebar.info(t("Analyze any Excel or CSV dataset, whatever its columns are"))
-
     from src.generic.generic_dashboard import render_generic_dashboard
 
     render_generic_dashboard()
     st.stop()
 
-st.sidebar.info(t("The original business dashboard (fixed column names)"))
 
 # Dashboard title
 st.title("AI Excel Dashboard")

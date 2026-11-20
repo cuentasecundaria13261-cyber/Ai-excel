@@ -4,19 +4,12 @@ ES = {}
 
 # ---- navigation, notices, AI access
 ES.update({
-    "Navigation": "Navegación",
     "Choose a dashboard": "Elige un panel",
-    "Business Dashboard": "Panel de negocio",
-    "Generic Dashboard": "Panel genérico",
     "Business (classic)": "Negocio (clásico)",
     "Free test version. Files are processed in memory and not saved by this app.":
         "Versión de prueba gratuita. Los archivos se procesan en memoria y esta app no los guarda.",
     "The original business dashboard (fixed column names)":
         "El panel de negocio original (nombres de columna fijos)",
-    "Upload your sales file and get a plain-language summary, alerts and charts":
-        "Sube tu archivo de ventas y obtén un resumen en lenguaje sencillo, alertas y gráficos",
-    "Analyze any Excel or CSV dataset, whatever its columns are":
-        "Analiza cualquier conjunto de datos de Excel o CSV, sin importar sus columnas",
     "**AI explanations run on your own computer**, so they are switched off on this website. "
     "Everything else on this page works without them: the summary, the alerts, the charts and the reports.":
         "**Las explicaciones con IA funcionan en tu propio computador**, por eso están desactivadas en este sitio web. "
@@ -354,7 +347,6 @@ ES.update({
     "Header row (1 = first row of the sheet)": "Fila de encabezados (1 = primera fila de la hoja)",
     "Could not open the Excel file: {error}": "No se pudo abrir el archivo de Excel: {error}",
     "File uploaded and read successfully!": "¡Archivo subido y leído correctamente!",
-    "Data cleaning": "Limpieza de datos",
     "Remove duplicate rows": "Quitar filas duplicadas",
     "Convert numbers stored as text (for example $1,200)": "Convertir números guardados como texto (por ejemplo $1,200)",
     "Detect and convert date columns": "Detectar y convertir columnas de fechas",
@@ -374,10 +366,8 @@ ES.update({
     "Columns": "Columnas",
     "Cleaned dataset preview": "Vista previa de los datos limpios",
     "Download Cleaned CSV": "Descargar CSV limpio",
-    "Column roles": "Roles de las columnas",
     "The app guessed what each column is. Change any that look wrong: measure = a number to analyze, dimension = a category to group by, date = a time column, id / text / ignore = not used for comparisons.":
         "La app adivinó qué es cada columna. Cambia las que veas mal: measure = un número para analizar, dimension = una categoría para agrupar, date = una columna de tiempo, id / text / ignore = no se usan para comparar.",
-    "Analysis settings": "Ajustes del análisis",
     "Main metric": "Métrica principal",
     "No numeric column found, so only record counts will be analyzed.":
         "No se encontró ninguna columna numérica, así que solo se analizará el conteo de registros.",
@@ -432,4 +422,28 @@ ES.update({
     "Analysis limitations": "Límites del análisis",
     "AI-generated from the calculated facts. Check important numbers against the tables and charts above.":
         "Generado por IA a partir de los datos calculados. Compara los números importantes con las tablas y gráficos de arriba.",
+})
+
+# ---- design update: simpler navigation and guidance
+ES.update({
+    "Sales analysis": "Análisis de ventas",
+    "Any other data": "Otros datos",
+    "For sales files: dates, products and money. Everything is detected for you.":
+        "Para archivos de ventas: fechas, productos y dinero. Todo se detecta automáticamente.",
+    "For any other table. The app works out what each column is.":
+        "Para cualquier otra tabla. La app descubre qué es cada columna.",
+    "Add your file": "Agrega tu archivo",
+    "Read the results": "Lee los resultados",
+    "Save or share": "Guarda o comparte",
+    "Red = act now · Yellow = look at it soon · Blue = good to know":
+        "Rojo = actúa ya · Amarillo = mira pronto · Azul = bueno saber",
+    "Click a tab to change the chart.": "Haz clic en una pestaña para cambiar el gráfico.",
+    "Share the report with your team, or keep a copy of your tidied data.":
+        "Comparte el informe con tu equipo o guarda una copia de tus datos ordenados.",
+    "Cleaning options (optional)": "Opciones de limpieza (opcional)",
+    "The app already chose sensible settings. Only change these if something looks wrong.":
+        "La app ya eligió ajustes razonables. Cámbialos solo si algo se ve mal.",
+    "Column roles (optional)": "Roles de las columnas (opcional)",
+    "Analysis settings (optional)": "Ajustes del análisis (opcional)",
+    "Preview of your file": "Vista previa de tu archivo",
 })

@@ -23,6 +23,7 @@ from src.generic.generic_analysis import (
 from src.generic.cached_io import clean_cached, read_cached
 from src.generic.generic_insights import generate_generic_insights
 from src.i18n import get_language, t
+from src.ui.style import render_steps
 
 
 def _md(text):
@@ -126,11 +127,13 @@ def render_insights(result):
 
 
 def render_generic_dashboard():
-    st.title(t("Generic Dashboard"))
+    st.title(t("Any other data"))
     st.write(
         t("Upload any Excel or CSV file. The app detects what each column is, "
           "cleans the data and explains it with AI, whatever the columns are.")
     )
+    steps_slot = st.empty()
+    render_steps(0, steps_slot)
 
     uploaded = st.file_uploader(
         t("Choose an Excel or CSV file"),
@@ -195,44 +198,46 @@ def render_generic_dashboard():
     large_note = ug.large_file_note(len(raw_df))
     if large_note:
         st.info(large_note)
-    st.dataframe(raw_df.head(100))
+    with st.expander(t("Preview of your file")):
+        st.dataframe(raw_df.head(100))
 
     # ---- 2. Clean
-    st.subheader(t("Data cleaning"))
-    left, right = st.columns(2)
-    with left:
-        remove_duplicates = st.checkbox(
-            t("Remove duplicate rows"), value=True, key=f"generic_dups_{file_id}"
-        )
-        convert_numbers = st.checkbox(
-            t("Convert numbers stored as text (for example $1,200)"),
-            value=True,
-            key=f"generic_nums_{file_id}",
-        )
-        parse_dates = st.checkbox(
-            t("Detect and convert date columns"), value=True, key=f"generic_dates_{file_id}"
-        )
-    with right:
-        missing_strategy = st.selectbox(
-            t("How should missing values be handled?"),
-            options=["keep", "drop", "fill"],
-            format_func=lambda x: {
-                "keep": t("Keep missing values"),
-                "drop": t("Drop rows with missing values"),
-                "fill": t("Fill (median for numbers, 'Unknown' for text)"),
-            }[x],
-            key=f"generic_missing_{file_id}",
-        )
-        date_order = st.selectbox(
-            t("Order of day and month in text dates"),
-            options=["auto", "day_first", "month_first"],
-            format_func=lambda x: {
-                "auto": t("Detect automatically"),
-                "day_first": t("Day first (31/12/2024)"),
-                "month_first": t("Month first (12/31/2024)"),
-            }[x],
-            key=f"generic_dateorder_{file_id}",
-        )
+    with st.expander(t("Cleaning options (optional)")):
+        st.caption(t("The app already chose sensible settings. Only change these if something looks wrong."))
+        left, right = st.columns(2)
+        with left:
+            remove_duplicates = st.checkbox(
+                t("Remove duplicate rows"), value=True, key=f"generic_dups_{file_id}"
+            )
+            convert_numbers = st.checkbox(
+                t("Convert numbers stored as text (for example $1,200)"),
+                value=True,
+                key=f"generic_nums_{file_id}",
+            )
+            parse_dates = st.checkbox(
+                t("Detect and convert date columns"), value=True, key=f"generic_dates_{file_id}"
+            )
+        with right:
+            missing_strategy = st.selectbox(
+                t("How should missing values be handled?"),
+                options=["keep", "drop", "fill"],
+                format_func=lambda x: {
+                    "keep": t("Keep missing values"),
+                    "drop": t("Drop rows with missing values"),
+                    "fill": t("Fill (median for numbers, 'Unknown' for text)"),
+                }[x],
+                key=f"generic_missing_{file_id}",
+            )
+            date_order = st.selectbox(
+                t("Order of day and month in text dates"),
+                options=["auto", "day_first", "month_first"],
+                format_func=lambda x: {
+                    "auto": t("Detect automatically"),
+                    "day_first": t("Day first (31/12/2024)"),
+                    "month_first": t("Month first (12/31/2024)"),
+                }[x],
+                key=f"generic_dateorder_{file_id}",
+            )
 
     cleaned_df, report = clean_cached(
         raw_df,
@@ -255,7 +260,7 @@ def render_generic_dashboard():
     if removed_personal:
         report = [*report, t("Removed columns that look like personal data: {columns}.", columns=", ".join(str(c) for c in removed_personal))]
 
-    with st.expander(t("What the cleaning did"), expanded=True):
+    with st.expander(t("What the cleaning did")):
         for action in report:
             st.write(f"- {action}")
 
@@ -276,27 +281,27 @@ def render_generic_dashboard():
     )
 
     # ---- 3. Column roles
-    st.subheader(t("Column roles"))
-    st.caption(
-        t("The app guessed what each column is. Change any that look wrong: "
-          "measure = a number to analyze, dimension = a category to group by, "
-          "date = a time column, id / text / ignore = not used for comparisons.")
-    )
+    with st.expander(t("Column roles (optional)")):
+        st.caption(
+            t("The app guessed what each column is. Change any that look wrong: "
+              "measure = a number to analyze, dimension = a category to group by, "
+              "date = a time column, id / text / ignore = not used for comparisons.")
+        )
 
-    inferred = infer_column_roles(cleaned_df)
-    signature = abs(hash((file_id, missing_strategy, tuple(inferred.items()))))
+        inferred = infer_column_roles(cleaned_df)
+        signature = abs(hash((file_id, missing_strategy, tuple(inferred.items()))))
 
-    roles_table = pd.DataFrame({"Column": list(inferred.keys()), "Role": list(inferred.values())})
-    edited = st.data_editor(
-        roles_table,
-        column_config={
-            "Role": st.column_config.SelectboxColumn("Role", options=ROLES, required=True),
-        },
-        disabled=["Column"],
-        hide_index=True,
-        key=f"generic_roles_{signature}",
-    )
-    roles = dict(zip(edited["Column"], edited["Role"]))
+        roles_table = pd.DataFrame({"Column": list(inferred.keys()), "Role": list(inferred.values())})
+        edited = st.data_editor(
+            roles_table,
+            column_config={
+                "Role": st.column_config.SelectboxColumn("Role", options=ROLES, required=True),
+            },
+            disabled=["Column"],
+            hide_index=True,
+            key=f"generic_roles_{signature}",
+        )
+        roles = dict(zip(edited["Column"], edited["Role"]))
 
     # ---- 4. Analysis settings
     measures = [c for c, r in roles.items() if r == "measure"]
@@ -308,49 +313,49 @@ def render_generic_dashboard():
 
     role_signature = abs(hash((signature, tuple(sorted(roles.items())))))
 
-    st.subheader(t("Analysis settings"))
-    left, middle, right = st.columns(3)
+    with st.expander(t("Analysis settings (optional)")):
+        left, middle, right = st.columns(3)
 
-    with left:
-        if measures:
-            suggested = suggest_main_measure(cleaned_df, roles)
-            main_measure = st.selectbox(
-                t("Main metric"),
-                measures,
-                index=measures.index(suggested) if suggested in measures else 0,
-                key=f"generic_measure_{role_signature}",
+        with left:
+            if measures:
+                suggested = suggest_main_measure(cleaned_df, roles)
+                main_measure = st.selectbox(
+                    t("Main metric"),
+                    measures,
+                    index=measures.index(suggested) if suggested in measures else 0,
+                    key=f"generic_measure_{role_signature}",
+                )
+            else:
+                main_measure = None
+                st.info(t("No numeric column found, so only record counts will be analyzed."))
+
+        with middle:
+            if dates:
+                suggested_date = suggest_main_date(cleaned_df, roles)
+                main_date = st.selectbox(
+                    t("Date column"),
+                    dates,
+                    index=dates.index(suggested_date) if suggested_date in dates else 0,
+                    key=f"generic_date_{role_signature}",
+                )
+            else:
+                main_date = None
+                st.info(t("No date column found, so time trends will be skipped."))
+
+        with right:
+            aggregation = st.selectbox(
+                t("How to combine values in a group"),
+                options=["sum", "mean"],
+                format_func=lambda x: t("Total (sum)") if x == "sum" else t("Average (mean)"),
+                key=f"generic_agg_{role_signature}",
             )
-        else:
-            main_measure = None
-            st.info(t("No numeric column found, so only record counts will be analyzed."))
 
-    with middle:
-        if dates:
-            suggested_date = suggest_main_date(cleaned_df, roles)
-            main_date = st.selectbox(
-                t("Date column"),
-                dates,
-                index=dates.index(suggested_date) if suggested_date in dates else 0,
-                key=f"generic_date_{role_signature}",
-            )
-        else:
-            main_date = None
-            st.info(t("No date column found, so time trends will be skipped."))
-
-    with right:
-        aggregation = st.selectbox(
-            t("How to combine values in a group"),
-            options=["sum", "mean"],
-            format_func=lambda x: t("Total (sum)") if x == "sum" else t("Average (mean)"),
-            key=f"generic_agg_{role_signature}",
+        chosen_dimensions = st.multiselect(
+            t("Columns to compare (groups)"),
+            options=dimensions,
+            default=dimensions[:MAX_DIMENSIONS],
+            key=f"generic_dims_{role_signature}",
         )
-
-    chosen_dimensions = st.multiselect(
-        t("Columns to compare (groups)"),
-        options=dimensions,
-        default=dimensions[:MAX_DIMENSIONS],
-        key=f"generic_dims_{role_signature}",
-    )
 
     # ---- 5. Analytics and charts
     try:
@@ -366,7 +371,8 @@ def render_generic_dashboard():
         st.error(t("Could not calculate the analytics: {error}", error=error))
         return
 
-    st.subheader(t("Overview"))
+    render_steps(1, steps_slot)
+    st.header(t("Overview"))
     metric_cols = st.columns(3)
     metric_cols[0].metric(t("Rows"), analytics["overview"]["rows"])
     metric_cols[1].metric(t("Columns"), analytics["overview"]["columns"])
@@ -398,7 +404,6 @@ def render_generic_dashboard():
         st.json(convert_to_json_safe(analytics))
 
     # ---- 6. AI insights
-    st.divider()
     st.header(t("AI Insights"))
 
     status = ai_status()

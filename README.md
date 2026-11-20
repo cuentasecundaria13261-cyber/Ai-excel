@@ -124,3 +124,7 @@ To show "You can also write to us: your@gmail.com" under the feedback form, add 
 ```toml
 FEEDBACK_EMAIL = "your@gmail.com"
 ```
+
+## Look and feel
+
+A calm light theme lives in `.streamlit/config.toml` (colours, font), and `src/ui/style.py` adds spacing, rounded cards, the three-step strip ("Add your file, Read the results, Save or share") and hides Streamlit's own menu. The sidebar has two pages: **Sales analysis** and **Any other data**. The old "Business (classic)" page is hidden; set the environment variable `SHOW_CLASSIC=1` to show it again. Advanced settings (cleaning options, column roles, analysis settings) are folded away in "(optional)" boxes, because the app already chooses sensible values.

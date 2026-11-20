@@ -4,3 +4,12 @@ maxUploadSize = 25
 
 [browser]
 gatherUsageStats = false
+
+[theme]
+# A calm light theme: white page, soft grey panels, one blue accent.
+base = "light"
+primaryColor = "#2F6FEB"
+backgroundColor = "#FFFFFF"
+secondaryBackgroundColor = "#F6F7F9"
+textColor = "#1F2430"
+font = "sans serif"

@@ -18,6 +18,7 @@ from src.generic.cached_io import clean_cached, read_cached
 from src.generic.generic_dashboard import render_insights
 from src.generic.generic_insights import generate_generic_insights
 from src.i18n import get_language, t
+from src.ui.style import render_steps
 from src.security import upload_guard as ug
 from src.security.privacy_ui import apply_personal_data_choice, render_privacy_note
 
@@ -93,11 +94,13 @@ def _show_alert(alert):
 
 
 def render_business_dashboard():
-    st.title(t("Business Dashboard"))
+    st.title(t("Sales analysis"))
     st.write(
         t("Upload your sales file. We tidy it, draw the charts and tell you what needs "
           "your attention - no Excel skills needed.")
     )
+    steps_slot = st.empty()
+    render_steps(0, steps_slot)
 
     uploads = st.file_uploader(
         t("Choose one or more Excel or CSV files"),
@@ -244,6 +247,7 @@ def render_business_dashboard():
     summary_lines = be.build_summary(work, kpis, periods, comparison, alerts, metric_label)
 
     # ---- 5. What happened
+    render_steps(1, steps_slot)
     st.header(t("What happened"))
     if filters_text:
         st.caption(_md(t("Filtered: {filters}", filters=filters_text)))
@@ -252,6 +256,7 @@ def render_business_dashboard():
 
     # ---- 6. Alerts
     st.subheader(t("Things to look at"))
+    st.caption(t("Red = act now · Yellow = look at it soon · Blue = good to know"))
     if alerts:
         for alert in alerts:
             _show_alert(alert)
@@ -288,6 +293,7 @@ def render_business_dashboard():
 
     # ---- 8. Charts
     st.subheader(t("Charts"))
+    st.caption(t("Click a tab to change the chart."))
     label = t(metric_label).lower()
 
     time_series, time_unit = be.chart_over_time(work)
@@ -326,7 +332,6 @@ def render_business_dashboard():
         st.info(t("Match a date, product or region column above to see charts."))
 
     # ---- 9. AI explanation
-    st.divider()
     st.header(t("Explain it to me (AI)"))
     st.caption(
         t("The AI reads the numbers above and explains them in plain words. "
@@ -370,8 +375,8 @@ def render_business_dashboard():
         render_insights(stored["result"])
 
     # ---- 10. Download the report
-    st.divider()
-    st.subheader(t("Take it with you"))
+    st.header(t("Take it with you"))
+    st.caption(t("Share the report with your team, or keep a copy of your tidied data."))
 
     charts_for_report = {
         t("Best products"): products_series,
