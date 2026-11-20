@@ -3,6 +3,7 @@
 import streamlit as st
 
 from src.security import upload_guard as ug
+from src.i18n import t
 
 
 def _md(text):
@@ -11,8 +12,8 @@ def _md(text):
 
 def render_privacy_note():
     st.caption(
-        "Free test version: your file is processed in memory during your visit and this app does not "
-        "save it. Please do not upload personal data or files you are not allowed to share."
+        t("Free test version: your file is processed in memory during your visit and this app does not "
+          "save it. Please do not upload personal data or files you are not allowed to share.")
     )
 
 
@@ -25,12 +26,12 @@ def apply_personal_data_choice(df, key):
     if not found:
         return df, []
 
-    listing = "; ".join(f"**{_md(column)}** ({reason})" for column, reason in found.items())
+    listing = "; ".join(f"**{_md(column)}** ({t(reason)})" for column, reason in found.items())
     st.warning(
-        f"Some columns look like personal data: {listing}. "
-        "You do not need them for sales analysis, and keeping personal data out is safer."
+        t("Some columns look like personal data: {listing}. "
+          "You do not need them for sales analysis, and keeping personal data out is safer.", listing=listing)
     )
-    remove = st.checkbox("Remove these columns before analysis (recommended)", value=True, key=key)
+    remove = st.checkbox(t("Remove these columns before analysis (recommended)"), value=True, key=key)
     if remove:
         return df.drop(columns=list(found)), list(found)
     return df, []

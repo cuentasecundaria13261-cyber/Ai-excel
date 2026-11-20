@@ -6,6 +6,7 @@ import re
 from src.ai.ai_service import generate_response
 from src.ai.insight_validator import validate_insight_payload
 from src.ai.prompt_builder import build_fact_catalog
+from src.i18n import language_instruction
 from src.security.upload_guard import sanitize_label
 
 
@@ -29,6 +30,7 @@ def build_generic_prompt(analytics, goal="", description=""):
         context_lines.append(f"What the user wants to learn: {goal.strip()}")
     context = "\n".join(context_lines) or "No extra context was provided."
 
+    language_line = language_instruction()
     return f"""
 You are a careful data analyst. The dataset can be about anything (sales, people,
 operations, science, finance...). Write insights and recommendations based ONLY
@@ -127,6 +129,7 @@ LIMITS:
   2 data_quality_interpretation items and 3 further_analysis_opportunities.
 - Use an empty list when nothing useful can be supported.
 - Do not add extra JSON keys.
+{language_line}
 """
 
 

@@ -15,6 +15,7 @@ from collections import deque
 from datetime import datetime, timezone
 
 from src.ai.ai_settings import get_int_setting
+from src.i18n import t
 
 DEFAULT_DAILY_CAP = 45     # about 20-45 reports, depending on retries
 DEFAULT_SESSION_CAP = 4
@@ -73,19 +74,19 @@ def reserve():
 
         if _day["count"] >= daily_cap():
             raise AiLimitReached(
-                "The free AI allowance for today has been used up. It starts again tomorrow. "
-                "Everything else on this page still works."
+                t("The free AI allowance for today has been used up. It starts again tomorrow. "
+                  "Everything else on this page still works.")
             )
         if int(state.get(SESSION_KEY, 0)) >= session_cap():
             raise AiLimitReached(
-                "You have used all the AI requests for this visit. Reload the page later to try again."
+                t("You have used all the AI requests for this visit. Reload the page later to try again.")
             )
 
         now = time.monotonic()
         while _recent and now - _recent[0] > BURST_SECONDS:
             _recent.popleft()
         if len(_recent) >= BURST_CALLS:
-            raise AiLimitReached("The AI is busy right now. Please try again in a minute.")
+            raise AiLimitReached(t("The AI is busy right now. Please try again in a minute."))
 
         _recent.append(now)
         _day["count"] += 1

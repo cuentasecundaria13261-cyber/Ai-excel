@@ -7,6 +7,7 @@ import urllib.request
 
 from src.ai import hosted_guard
 from src.ai.ai_settings import get_setting
+from src.i18n import t
 
 # The AI runs on the computer where Ollama is installed. These can be changed
 # without editing code by setting environment variables before starting the app:
@@ -95,7 +96,7 @@ def _groq_response(prompt, timeout=GROQ_TIMEOUT):
     key = get_setting("GROQ_API_KEY")
     model = hosted_model()
     if len(prompt) > GROQ_MAX_PROMPT_CHARS:
-        raise RuntimeError("This dataset summary is too large for the free online AI. Try filtering the data first.")
+        raise RuntimeError(t("This dataset summary is too large for the free online AI. Try filtering the data first."))
 
     hosted_guard.reserve()   # raises AiLimitReached with a visitor-friendly message
 
@@ -135,15 +136,15 @@ def _groq_response(prompt, timeout=GROQ_TIMEOUT):
     except urllib.error.HTTPError as error:
         # The service did answer, so the request counts. Never show the key or raw details.
         if error.code in (401, 403):
-            raise RuntimeError("The online AI rejected the app's key. The owner needs to check it.") from error
+            raise RuntimeError(t("The online AI rejected the app's key. The owner needs to check it.")) from error
         if error.code == 429:
-            raise RuntimeError("The free online AI is busy or its limit was reached. Please try again in a minute.") from error
-        raise RuntimeError(f"The online AI returned an error (HTTP {error.code}). Please try again.") from error
+            raise RuntimeError(t("The free online AI is busy or its limit was reached. Please try again in a minute.")) from error
+        raise RuntimeError(t("The online AI returned an error (HTTP {code}). Please try again.", code=error.code)) from error
     except (urllib.error.URLError, TimeoutError, socket.timeout) as error:
         hosted_guard.release()
-        raise RuntimeError("Could not reach the online AI. Please try again in a moment.") from error
+        raise RuntimeError(t("Could not reach the online AI. Please try again in a moment.")) from error
     except (KeyError, IndexError, TypeError, ValueError) as error:
-        raise RuntimeError("The online AI sent an answer the app could not read. Please try again.") from error
+        raise RuntimeError(t("The online AI sent an answer the app could not read. Please try again.")) from error
 
 
 def _ollama_response(prompt, timeout=600):

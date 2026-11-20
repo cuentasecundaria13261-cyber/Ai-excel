@@ -3,6 +3,7 @@
 import streamlit as st
 
 from src.ai import hosted_guard
+from src.i18n import t
 
 
 def render_ai_unavailable(status):
@@ -11,28 +12,28 @@ def render_ai_unavailable(status):
 
     if status.get("reason") == "model_missing":
         st.info(
-            "The AI program (Ollama) is running on this computer, but the model "
-            f"**{model}** is not installed yet. Install it with this command, then reload the page:"
+            t("The AI program (Ollama) is running on this computer, but the model "
+              "**{model}** is not installed yet. Install it with this command, then reload the page:", model=model)
         )
         st.code(f"ollama pull {model}", language="bash")
         return
 
     st.info(
-        "**AI explanations run on your own computer**, so they are switched off on this website. "
-        "Everything else on this page works without them: the summary, the alerts, the charts and the reports."
+        t("**AI explanations run on your own computer**, so they are switched off on this website. "
+          "Everything else on this page works without them: the summary, the alerts, the charts and the reports.")
     )
-    with st.expander("How to turn on AI explanations (free)"):
+    with st.expander(t("How to turn on AI explanations (free)")):
         st.markdown(
-            "1. Install **Ollama** from ollama.com (free, runs on your computer).\n"
-            "2. Download the model once:\n"
+            t("1. Install **Ollama** from ollama.com (free, runs on your computer).\n"
+              "2. Download the model once:\n")
         )
         st.code(f"ollama pull {model}", language="bash")
         st.markdown(
-            "3. Download this project and start it on your computer:\n"
+            t("3. Download this project and start it on your computer:\n")
         )
         st.code("python -m streamlit run app.py", language="bash")
         st.caption(
-            "Your files then stay on your computer, and the AI button appears automatically."
+            t("Your files then stay on your computer, and the AI button appears automatically.")
         )
 
 
@@ -45,22 +46,22 @@ def ai_gate(status, key):
         return True
 
     st.info(
-        "**AI explanations on this website use a free online AI service (Groq).** "
-        "If you continue, a summary is sent there: the totals, the names of groups such as products "
-        "or regions, the alerts, and anything you type in the boxes above. "
-        "Your file itself is not sent. Do not type personal data."
+        t("**AI explanations on this website use a free online AI service (Groq).** "
+          "If you continue, a summary is sent there: the totals, the names of groups such as products "
+          "or regions, the alerts, and anything you type in the boxes above. "
+          "Your file itself is not sent. Do not type personal data.")
     )
     left = hosted_guard.remaining()
     if left["daily_left"] <= 0:
-        st.warning("The free AI allowance for today has been used up. It starts again tomorrow.")
+        st.warning(t("The free AI allowance for today has been used up. It starts again tomorrow."))
         return False
     if left["session_left"] <= 0:
-        st.warning("You have used all the AI requests for this visit. Reload the page later to try again.")
+        st.warning(t("You have used all the AI requests for this visit. Reload the page later to try again."))
         return False
 
     agreed = st.checkbox(
-        "I understand, and I agree to send this summary to the online AI",
+        t("I understand, and I agree to send this summary to the online AI"),
         key=f"ai_consent_{key}",
     )
-    st.caption(f"AI requests left in this visit: {left['session_left']}")
+    st.caption(t("AI requests left in this visit: {count}", count=left["session_left"]))
     return bool(agreed)

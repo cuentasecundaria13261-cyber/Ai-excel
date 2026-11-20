@@ -18,6 +18,7 @@ import unicodedata
 import zipfile
 
 import pandas as pd
+from src.i18n import t
 
 
 def _env_int(name, default):
@@ -53,8 +54,8 @@ def check_file_bytes(data, filename, max_file_mb=None, max_uncompressed_mb=None)
 
     if len(data) > max_file_mb * _MB:
         raise UploadRejected(
-            f"This file is {len(data) / _MB:.1f} MB. The free test version accepts files up to "
-            f"{max_file_mb} MB. Try a smaller export or fewer columns."
+            t("This file is {size} MB. The free test version accepts files up to "
+              "{limit} MB. Try a smaller export or fewer columns.", size=f"{len(data) / _MB:.1f}", limit=max_file_mb)
         )
 
     if filename.lower().endswith((".xlsx", ".xlsm")):
@@ -63,16 +64,16 @@ def check_file_bytes(data, filename, max_file_mb=None, max_uncompressed_mb=None)
                 entries = archive.infolist()
         except zipfile.BadZipFile as error:
             raise UploadRejected(
-                "This does not look like a valid Excel (.xlsx) file. "
-                "Open it in Excel and use Save As to create a new .xlsx or .csv."
+                t("This does not look like a valid Excel (.xlsx) file. "
+                  "Open it in Excel and use Save As to create a new .xlsx or .csv.")
             ) from error
 
         if len(entries) > MAX_ZIP_ENTRIES:
-            raise UploadRejected("This Excel file has an unusual structure and was not opened.")
+            raise UploadRejected(t("This Excel file has an unusual structure and was not opened."))
         if sum(entry.file_size for entry in entries) > max_uncompressed_mb * _MB:
             raise UploadRejected(
-                "This Excel file is far larger than it looks once opened, so it was not loaded. "
-                "Try saving it again as a .csv."
+                t("This Excel file is far larger than it looks once opened, so it was not loaded. "
+                  "Try saving it again as a .csv.")
             )
 
 
@@ -118,12 +119,13 @@ def check_sheet_size(data, filename, sheet_name=None, max_rows=None, max_columns
 
     if used_rows > max_rows + 1:
         raise UploadRejected(
-            f"This sheet has more than {max_rows:,} rows. The free test version handles up to "
-            f"{max_rows:,} rows. Filter the data or split it into smaller files."
+            t("This sheet has more than {limit} rows. The free test version handles up to "
+              "{limit} rows. Filter the data or split it into smaller files.", limit=f"{max_rows:,}")
         )
     if used_cols > max_columns:
         raise UploadRejected(
-            f"This sheet has {used_cols:,} columns. The free test version handles up to {max_columns} columns."
+            t("This sheet has {count} columns. The free test version handles up to {limit} columns.",
+              count=f"{used_cols:,}", limit=max_columns)
         )
 
 
@@ -133,22 +135,21 @@ def check_frame(df, max_rows=None, max_columns=None):
     max_columns = MAX_COLUMNS if max_columns is None else max_columns
     if len(df) > max_rows:
         raise UploadRejected(
-            f"This file has {len(df):,} rows. The free test version handles up to {max_rows:,} rows. "
-            "Filter the data or split it into smaller files."
+            t("This file has {count} rows. The free test version handles up to {limit} rows. "
+              "Filter the data or split it into smaller files.", count=f"{len(df):,}", limit=f"{max_rows:,}")
         )
     if df.shape[1] > max_columns:
         raise UploadRejected(
-            f"This file has {df.shape[1]:,} columns. The free test version handles up to {max_columns} columns."
+            t("This file has {count} columns. The free test version handles up to {limit} columns.",
+              count=f"{df.shape[1]:,}", limit=max_columns)
         )
 
 
 def large_file_note(rows):
     """A friendly warning for big (but allowed) tables, or None."""
     if rows > LARGE_ROWS:
-        return (
-            f"This is a large file ({rows:,} rows). Everything still works, but it may take a few "
-            "seconds to load and to react when you change something."
-        )
+        return t("This is a large file ({rows} rows). Everything still works, but it may take a few "
+                 "seconds to load and to react when you change something.", rows=f"{rows:,}")
     return None
 
 

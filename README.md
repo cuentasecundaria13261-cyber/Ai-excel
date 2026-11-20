@@ -112,3 +112,15 @@ On your own computer the AI runs with Ollama and nothing leaves your machine. On
 3. Check your limits in the Groq console (Settings > Limits). Set `GROQ_DAILY_CAP` below your daily allowance. The default is 45 requests a day, 4 per visitor visit, and at most 2 per minute for the whole app. One AI report can use up to 2 requests.
 
 Rules the app follows: Ollama is always used first when it is running; visitors must tick a box agreeing that a summary (totals, group names, alerts and any text they typed, never the file) is sent to the online AI; when a limit is reached the AI button is replaced by a friendly message and the rest of the app keeps working. The daily counter is kept in the server's memory, so it starts again from zero if the app restarts.
+
+## Languages (English / Español)
+
+The sidebar has a language switch. It starts from the visitor's browser language. The Business Dashboard and the Generic Dashboard are in both languages (the "Business (classic)" page is English only). Spanish texts live in `src/locales/es.py`: the English sentence is the key. A text with no Spanish entry just shows in English. When the language is Spanish, numbers use `12.345,67`, dates use `5 mar 2026`, and the AI is asked to write in Spanish.
+
+## Your email in the feedback box
+
+To show "You can also write to us: your@gmail.com" under the feedback form, add it to Streamlit Secrets (not to the code, so it does not sit in your public GitHub repo for spam bots):
+
+```toml
+FEEDBACK_EMAIL = "your@gmail.com"
+```

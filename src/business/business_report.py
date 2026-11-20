@@ -13,8 +13,19 @@ from datetime import datetime
 import pandas as pd
 
 from src.business.business_engine import fmt_number, fmt_pct
+from src.i18n import get_language, t
 
-_SEVERITY_TEXT = {"high": "Urgent", "medium": "Look at this", "info": "Good to know"}
+def _severity_text(level):
+    return {"high": t("Urgent"), "medium": t("Look at this"), "info": t("Good to know")}[level]
+
+
+def _created_text():
+    stamp = datetime.now()
+    if get_language() == "es":
+        return t("Created {when}", when=stamp.strftime("%d/%m/%Y %H:%M"))
+    return t("Created {when}", when=f"{stamp:%b %d, %Y %H:%M}")
+
+
 _SEVERITY_COLOR = {"high": "#b3261e", "medium": "#a15c00", "info": "#1f5fa8"}
 
 
@@ -67,12 +78,12 @@ def _kpi_rows(kpis, comparison, metric_label):
     """[(label, value text, change text or '')]"""
     changes = comparison["change_pct"] if comparison else {}
     rows = [
-        (f"Total {metric_label.lower()}", fmt_number(kpis["revenue"]), fmt_pct(changes.get("revenue")) if changes.get("revenue") is not None else ""),
-        ("Orders", fmt_number(kpis["orders"]), fmt_pct(changes.get("orders")) if changes.get("orders") is not None else ""),
-        ("Average per order", fmt_number(kpis["average_order_value"]), fmt_pct(changes.get("average_order_value")) if changes.get("average_order_value") is not None else ""),
+        (t("Total {label}", label=t(metric_label).lower()), fmt_number(kpis["revenue"]), fmt_pct(changes.get("revenue")) if changes.get("revenue") is not None else ""),
+        (t("Orders"), fmt_number(kpis["orders"]), fmt_pct(changes.get("orders")) if changes.get("orders") is not None else ""),
+        (t("Average per order"), fmt_number(kpis["average_order_value"]), fmt_pct(changes.get("average_order_value")) if changes.get("average_order_value") is not None else ""),
     ]
     if "units_sold" in kpis:
-        rows.append(("Units sold", fmt_number(kpis["units_sold"]), fmt_pct(changes.get("units_sold")) if changes.get("units_sold") is not None else ""))
+        rows.append((t("Units sold"), fmt_number(kpis["units_sold"]), fmt_pct(changes.get("units_sold")) if changes.get("units_sold") is not None else ""))
     return rows
 
 
@@ -146,7 +157,7 @@ def build_report_html(
     esc = html.escape
     ai = _ai_parts(ai_result)
     out = [
-        "<!doctype html><html lang='en'><head><meta charset='utf-8'>",
+        f"<!doctype html><html lang='{get_language()}'><head><meta charset='utf-8'>",
         "<meta name='viewport' content='width=device-width, initial-scale=1'>",
         f"<title>{esc(title)}</title>",
         "<style>"
@@ -159,41 +170,41 @@ def build_report_html(
         "@media print{body{margin:0}}"
         "</style></head><body>",
         f"<h1>{esc(title)}</h1>",
-        f"<p class='muted'>Created {datetime.now():%b %d, %Y %H:%M}"
+        f"<p class='muted'>{esc(_created_text())}"
         f"{' · ' + esc(filters_text) if filters_text else ''}</p>",
-        "<h2>What happened</h2><ul>",
+        f"<h2>{esc(t('What happened'))}</h2><ul>",
     ]
     out += [f"<li>{esc(line)}</li>" for line in summary_lines]
     out.append("</ul>")
 
-    out.append("<h2>Key numbers</h2><div class='kpis'>")
+    out.append(f"<h2>{esc(t('Key numbers'))}</h2><div class='kpis'>")
     for label, value, change in _kpi_rows(kpis, comparison, metric_label):
         css = ""
         if change:
             css = "up" if change.startswith("+") else "down"
         out.append(
             f"<div class='kpi'><span class='muted'>{esc(label)}</span><b>{esc(value)}</b>"
-            f"{f'<span class={css}>{esc(change)} vs previous period</span>' if change else ''}</div>"
+            f"{f'<span class={css}>{esc(change)} ' + esc(t('vs previous period')) + '</span>' if change else ''}</div>"
         )
     out.append("</div>")
     if periods:
         out.append(
-            f"<p class='muted'>Latest period: {esc(periods['current_label'])}. "
-            f"Previous period: {esc(periods['previous_label'])}.</p>"
+            "<p class='muted'>" + esc(t("Latest period: {current}. Previous period: {previous}.",
+                current=periods["current_label"], previous=periods["previous_label"])) + "</p>"
         )
 
     if alerts:
-        out.append("<h2>Things to look at</h2>")
+        out.append(f"<h2>{esc(t('Things to look at'))}</h2>")
         for alert in alerts:
             color = _SEVERITY_COLOR[alert["severity"]]
             out.append(
                 f"<div class='alert' style='border-color:{color}'><b style='color:{color}'>"
-                f"{esc(_SEVERITY_TEXT[alert['severity']])}:</b> <b>{esc(alert['title'])}</b><br>"
+                f"{esc(_severity_text(alert['severity']))}:</b> <b>{esc(alert['title'])}</b><br>"
                 f"{esc(alert['detail'])}</div>"
             )
 
     if time_series is not None and len(time_series) >= 2:
-        out.append(f"<h2>{esc(metric_label)} over time (by {esc(time_unit)})</h2>")
+        out.append("<h2>" + esc(t("{metric} over time (by {unit})", metric=t(metric_label), unit=t(time_unit))) + "</h2>")
         out.append(_svg_line(time_series))
 
     for heading, series in (charts or {}).items():
@@ -202,18 +213,18 @@ def build_report_html(
             out.append(f"<h2>{esc(heading)}</h2>{chart}")
 
     if ai:
-        out.append("<h2>Explained in plain words (AI)</h2>")
+        out.append(f"<h2>{esc(t('Explained in plain words (AI)'))}</h2>")
         if ai["summary"]:
             out.append(f"<p>{esc(ai['summary'])}</p>")
         if ai["recommendations"]:
-            out.append("<h3>What you could do</h3><ul>")
+            out.append(f"<h3>{esc(t('What you could do'))}</h3><ul>")
             for rec in ai["recommendations"]:
                 out.append(
-                    f"<li><b>{esc(rec['action'])}</b><br><span class='muted'>Why: {esc(rec['reason'])}"
-                    f"{' · Keep in mind: ' + esc(rec['caveat']) if rec['caveat'] else ''}</span></li>"
+                    f"<li><b>{esc(rec['action'])}</b><br><span class='muted'>{esc(t('Why:'))} {esc(rec['reason'])}"
+                    f"{' · ' + esc(t('Keep in mind:')) + ' ' + esc(rec['caveat']) if rec['caveat'] else ''}</span></li>"
                 )
             out.append("</ul>")
-        out.append("<p class='muted'>AI-written text can contain mistakes. Check important numbers against the tables above.</p>")
+        out.append("<p class='muted'>" + esc(t("AI-written text can contain mistakes. Check important numbers against the tables above.")) + "</p>")
 
     out.append("</body></html>")
     return "".join(out)
@@ -254,15 +265,15 @@ def build_report_pdf(
                             topMargin=1.8 * cm, bottomMargin=1.8 * cm, title=title)
     story = [
         Paragraph(esc(title), styles["Title"]),
-        Paragraph(f"Created {datetime.now():%b %d, %Y %H:%M}{' · ' + esc(filters_text) if filters_text else ''}", small),
+        Paragraph(f"{esc(_created_text())}{' · ' + esc(filters_text) if filters_text else ''}", small),
         Spacer(1, 10),
-        Paragraph("What happened", styles["Heading2"]),
+        Paragraph(esc(t("What happened")), styles["Heading2"]),
     ]
     for line in summary_lines:
         story.append(Paragraph("• " + esc(line), styles["BodyText"]))
 
-    story.append(Paragraph("Key numbers", styles["Heading2"]))
-    rows = [["", "Value", "Change vs previous period"]]
+    story.append(Paragraph(esc(t("Key numbers")), styles["Heading2"]))
+    rows = [["", t("Value"), t("Change vs previous period")]]
     for label, value, change in _kpi_rows(kpis, comparison, metric_label):
         rows.append([label, value, change or "-"])
     table = Table(rows, colWidths=[6 * cm, 4 * cm, 6 * cm])
@@ -275,13 +286,14 @@ def build_report_pdf(
     if periods:
         story.append(Spacer(1, 4))
         story.append(Paragraph(
-            f"Latest period: {esc(periods['current_label'])}. Previous period: {esc(periods['previous_label'])}.", small))
+            esc(t("Latest period: {current}. Previous period: {previous}.",
+                  current=periods["current_label"], previous=periods["previous_label"])), small))
 
     if alerts:
-        story.append(Paragraph("Things to look at", styles["Heading2"]))
+        story.append(Paragraph(esc(t("Things to look at")), styles["Heading2"]))
         for alert in alerts:
             story.append(Paragraph(
-                f"<b>{esc(_SEVERITY_TEXT[alert['severity']])}: {esc(alert['title'])}</b><br/>{esc(alert['detail'])}",
+                f"<b>{esc(_severity_text(alert['severity']))}: {esc(alert['title'])}</b><br/>{esc(alert['detail'])}",
                 styles["BodyText"]))
             story.append(Spacer(1, 4))
 
@@ -290,7 +302,7 @@ def build_report_pdf(
             continue
         series = _clean_labels(series)
         story.append(Paragraph(esc(heading), styles["Heading2"]))
-        data = [["Name", metric_label]] + [[str(k)[:40], fmt_number(v)] for k, v in series.items()]
+        data = [[t("Name"), t(metric_label)]] + [[str(k)[:40], fmt_number(v)] for k, v in series.items()]
         chart_table = Table(data, colWidths=[9 * cm, 5 * cm])
         chart_table.setStyle(TableStyle([
             ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#eeeeee")),
@@ -301,14 +313,14 @@ def build_report_pdf(
 
     ai = _ai_parts(ai_result)
     if ai:
-        story.append(Paragraph("Explained in plain words (AI)", styles["Heading2"]))
+        story.append(Paragraph(esc(t("Explained in plain words (AI)")), styles["Heading2"]))
         if ai["summary"]:
             story.append(Paragraph(esc(ai["summary"]), styles["BodyText"]))
         for rec in ai["recommendations"]:
             story.append(Paragraph(
-                f"• <b>{esc(rec['action'])}</b> - why: {esc(rec['reason'])}"
-                f"{'. Keep in mind: ' + esc(rec['caveat']) if rec['caveat'] else ''}", styles["BodyText"]))
-        story.append(Paragraph("AI-written text can contain mistakes. Check important numbers against the tables.", small))
+                f"• <b>{esc(rec['action'])}</b> - {esc(t('why:'))} {esc(rec['reason'])}"
+                f"{'. ' + esc(t('Keep in mind:')) + ' ' + esc(rec['caveat']) if rec['caveat'] else ''}", styles["BodyText"]))
+        story.append(Paragraph(esc(t("AI-written text can contain mistakes. Check important numbers against the tables.")), small))
 
     doc.build(story)
     return buffer.getvalue()

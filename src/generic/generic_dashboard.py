@@ -22,6 +22,7 @@ from src.generic.generic_analysis import (
 )
 from src.generic.cached_io import clean_cached, read_cached
 from src.generic.generic_insights import generate_generic_insights
+from src.i18n import get_language, t
 
 
 def _md(text):
@@ -44,7 +45,7 @@ def _evidence_line(evidence, facts):
 def _show_evidence(evidence, facts):
     line = _evidence_line(evidence, facts)
     if line:
-        st.caption(_md(f"Evidence: {line}"))
+        st.caption(_md(t("Evidence: {line}", line=line)))
 
 
 def render_insights(result):
@@ -53,86 +54,86 @@ def render_insights(result):
     facts = {fact["id"]: fact for fact in result["fact_catalog"]}
 
     if not result["structure_valid"]:
-        st.warning("The AI response had some issues, but it is shown below.")
-        with st.expander("Validation issues"):
+        st.warning(t("The AI response had some issues, but it is shown below."))
+        with st.expander(t("Validation issues")):
             for issue in result["validation_issues"]:
                 st.write(f"- {issue}")
 
     if not isinstance(insights, dict):
-        st.error("The AI did not return a usable report. Please try again.")
+        st.error(t("The AI did not return a usable report. Please try again."))
         return
 
-    st.subheader("Executive summary")
+    st.subheader(t("Executive summary"))
     summary = insights.get("executive_summary")
     if isinstance(summary, dict):
         st.write(_md(summary.get("text", "")))
         _show_evidence(summary.get("evidence"), facts)
     else:
-        st.write("No summary generated.")
+        st.write(t("No summary generated."))
 
-    st.subheader("Key observations")
+    st.subheader(t("Key observations"))
     observations = insights.get("key_performance_observations", [])
     if observations:
         for obs in observations:
             st.markdown(_md(f"- **{obs.get('category', '')}**: {obs.get('analysis', '')}"))
             _show_evidence(obs.get("evidence"), facts)
     else:
-        st.write("No significant observations identified.")
+        st.write(t("No significant observations identified."))
 
-    st.subheader("Recommendations")
+    st.subheader(t("Recommendations"))
     recommendations = insights.get("business_recommendations", [])
     if recommendations:
         for rec in recommendations:
-            st.markdown(_md(f"- **Action**: {rec.get('action', '')}"))
-            st.caption(_md(f"Reason: {rec.get('reason', '')}"))
-            st.caption(_md(f"Caveat: {rec.get('caveat', '')}"))
+            st.markdown(_md("- **" + t("Action") + f"**: {rec.get('action', '')}"))
+            st.caption(_md(t("Reason:") + f" {rec.get('reason', '')}"))
+            st.caption(_md(t("Caveat:") + f" {rec.get('caveat', '')}"))
             _show_evidence(rec.get("evidence"), facts)
     else:
-        st.write("No recommendations at this time.")
+        st.write(t("No recommendations at this time."))
 
-    st.subheader("Data quality")
+    st.subheader(t("Data quality"))
     quality_items = insights.get("data_quality_interpretation", [])
     if quality_items:
         for item in quality_items:
             st.markdown(_md(f"- **{item.get('title', '')}**: {item.get('explanation', '')}"))
             _show_evidence(item.get("evidence"), facts)
     else:
-        st.write("No data quality issues identified.")
+        st.write(t("No data quality issues identified."))
 
-    st.subheader("Further analysis opportunities")
+    st.subheader(t("Further analysis opportunities"))
     further = insights.get("further_analysis_opportunities", [])
     if further:
         for item in further:
             st.markdown(
                 _md(
                     f"- **{item.get('question', '')}** "
-                    f"(needs: {item.get('additional_data_required', '')})"
+                    f"({t('needs:')} {item.get('additional_data_required', '')})"
                 )
             )
     else:
-        st.write("No further analysis suggestions.")
+        st.write(t("No further analysis suggestions."))
 
     limitations = insights.get("analysis_limitations", [])
     if limitations:
-        st.subheader("Analysis limitations")
+        st.subheader(t("Analysis limitations"))
         for limitation in limitations:
             st.markdown(_md(f"- {limitation}"))
 
     st.caption(
-        "AI-generated from the calculated facts. Check important numbers "
-        "against the tables and charts above."
+        t("AI-generated from the calculated facts. Check important numbers "
+          "against the tables and charts above.")
     )
 
 
 def render_generic_dashboard():
-    st.title("Generic Dashboard")
+    st.title(t("Generic Dashboard"))
     st.write(
-        "Upload any Excel or CSV file. The app detects what each column is, "
-        "cleans the data and explains it with AI, whatever the columns are."
+        t("Upload any Excel or CSV file. The app detects what each column is, "
+          "cleans the data and explains it with AI, whatever the columns are.")
     )
 
     uploaded = st.file_uploader(
-        "Choose an Excel or CSV file",
+        t("Choose an Excel or CSV file"),
         type=["csv", "xlsx", "xlsm"],
         key="generic_dataset_uploader",
     )
@@ -143,14 +144,14 @@ def render_generic_dashboard():
     else:
         use_sample = st.session_state.get("generic_use_sample", False)
         if not use_sample:
-            st.info("Upload a file to get started.")
-            if st.button("Try it with sample data", key="generic_sample_btn"):
+            st.info(t("Upload a file to get started."))
+            if st.button(t("Try it with sample data"), key="generic_sample_btn"):
                 st.session_state["generic_use_sample"] = True
                 use_sample = True
         if not use_sample:
             return
         uploaded = sample_upload()
-        st.caption("You are looking at made-up sample data. Upload your own file above to analyze it.")
+        st.caption(t("You are looking at made-up sample data. Upload your own file above to analyze it."))
 
     file_bytes = uploaded.getvalue()
     file_id = f"{uploaded.name}:{len(file_bytes)}"
@@ -161,17 +162,17 @@ def render_generic_dashboard():
         try:
             sheets = list_sheets(file_bytes)
         except Exception as error:
-            st.error(f"Could not open the Excel file: {error}")
+            st.error(t("Could not open the Excel file: {error}", error=error))
             return
         if len(sheets) > 1:
-            sheet_name = st.selectbox("Sheet to analyze", sheets, key=f"generic_sheet_{file_id}")
+            sheet_name = st.selectbox(t("Sheet to analyze"), sheets, key=f"generic_sheet_{file_id}")
         else:
             sheet_name = sheets[0]
 
-    with st.expander("Reading options"):
+    with st.expander(t("Reading options")):
         header_row = int(
             st.number_input(
-                "Header row (1 = first row of the sheet)",
+                t("Header row (1 = first row of the sheet)"),
                 min_value=1,
                 max_value=50,
                 value=1,
@@ -183,58 +184,59 @@ def render_generic_dashboard():
     try:
         raw_df = read_cached(file_bytes, uploaded.name, sheet_name, header_row)
     except Exception as error:
-        st.error(f"Could not read the file: {error}")
+        st.error(t("Could not read the file: {error}", error=error))
         return
 
     if raw_df.empty:
-        st.warning("The file was read, but it has no data rows.")
+        st.warning(t("The file was read, but it has no data rows."))
         return
 
-    st.success("File uploaded and read successfully!")
+    st.success(t("File uploaded and read successfully!"))
     large_note = ug.large_file_note(len(raw_df))
     if large_note:
         st.info(large_note)
     st.dataframe(raw_df.head(100))
 
     # ---- 2. Clean
-    st.subheader("Data cleaning")
+    st.subheader(t("Data cleaning"))
     left, right = st.columns(2)
     with left:
         remove_duplicates = st.checkbox(
-            "Remove duplicate rows", value=True, key=f"generic_dups_{file_id}"
+            t("Remove duplicate rows"), value=True, key=f"generic_dups_{file_id}"
         )
         convert_numbers = st.checkbox(
-            "Convert numbers stored as text (for example $1,200)",
+            t("Convert numbers stored as text (for example $1,200)"),
             value=True,
             key=f"generic_nums_{file_id}",
         )
         parse_dates = st.checkbox(
-            "Detect and convert date columns", value=True, key=f"generic_dates_{file_id}"
+            t("Detect and convert date columns"), value=True, key=f"generic_dates_{file_id}"
         )
     with right:
         missing_strategy = st.selectbox(
-            "How should missing values be handled?",
+            t("How should missing values be handled?"),
             options=["keep", "drop", "fill"],
             format_func=lambda x: {
-                "keep": "Keep missing values",
-                "drop": "Drop rows with missing values",
-                "fill": "Fill (median for numbers, 'Unknown' for text)",
+                "keep": t("Keep missing values"),
+                "drop": t("Drop rows with missing values"),
+                "fill": t("Fill (median for numbers, 'Unknown' for text)"),
             }[x],
             key=f"generic_missing_{file_id}",
         )
         date_order = st.selectbox(
-            "Order of day and month in text dates",
+            t("Order of day and month in text dates"),
             options=["auto", "day_first", "month_first"],
             format_func=lambda x: {
-                "auto": "Detect automatically",
-                "day_first": "Day first (31/12/2024)",
-                "month_first": "Month first (12/31/2024)",
+                "auto": t("Detect automatically"),
+                "day_first": t("Day first (31/12/2024)"),
+                "month_first": t("Month first (12/31/2024)"),
             }[x],
             key=f"generic_dateorder_{file_id}",
         )
 
     cleaned_df, report = clean_cached(
         raw_df,
+        language=get_language(),
         remove_duplicates=remove_duplicates,
         convert_numbers=convert_numbers,
         parse_dates=parse_dates,
@@ -243,30 +245,30 @@ def render_generic_dashboard():
     )
 
     if cleaned_df.empty:
-        st.error("No rows are left after cleaning. Try keeping the missing values.")
+        st.error(t("No rows are left after cleaning. Try keeping the missing values."))
         return
 
     cleaned_df, removed_personal = apply_personal_data_choice(cleaned_df, f"generic_pii_{file_id}")
     if cleaned_df.shape[1] == 0:
-        st.error("No columns are left after removing personal data. Untick the box to keep them, or upload a different file.")
+        st.error(t("No columns are left after removing personal data. Untick the box to keep them, or upload a different file."))
         return
     if removed_personal:
-        report = [*report, f"Removed columns that look like personal data: {', '.join(str(c) for c in removed_personal)}."]
+        report = [*report, t("Removed columns that look like personal data: {columns}.", columns=", ".join(str(c) for c in removed_personal))]
 
-    with st.expander("What the cleaning did", expanded=True):
+    with st.expander(t("What the cleaning did"), expanded=True):
         for action in report:
             st.write(f"- {action}")
 
     col1, col2, col3 = st.columns(3)
-    col1.metric("Original rows", len(raw_df))
-    col2.metric("Cleaned rows", len(cleaned_df))
-    col3.metric("Columns", len(cleaned_df.columns))
+    col1.metric(t("Original rows"), len(raw_df))
+    col2.metric(t("Cleaned rows"), len(cleaned_df))
+    col3.metric(t("Columns"), len(cleaned_df.columns))
 
-    with st.expander("Cleaned dataset preview"):
+    with st.expander(t("Cleaned dataset preview")):
         st.dataframe(cleaned_df.head(100))
 
     st.download_button(
-        label="Download Cleaned CSV",
+        label=t("Download Cleaned CSV"),
         data=ug.to_safe_csv_bytes(cleaned_df),
         file_name="cleaned_dataset.csv",
         mime="text/csv",
@@ -274,11 +276,11 @@ def render_generic_dashboard():
     )
 
     # ---- 3. Column roles
-    st.subheader("Column roles")
+    st.subheader(t("Column roles"))
     st.caption(
-        "The app guessed what each column is. Change any that look wrong: "
-        "measure = a number to analyze, dimension = a category to group by, "
-        "date = a time column, id / text / ignore = not used for comparisons."
+        t("The app guessed what each column is. Change any that look wrong: "
+          "measure = a number to analyze, dimension = a category to group by, "
+          "date = a time column, id / text / ignore = not used for comparisons.")
     )
 
     inferred = infer_column_roles(cleaned_df)
@@ -306,45 +308,45 @@ def render_generic_dashboard():
 
     role_signature = abs(hash((signature, tuple(sorted(roles.items())))))
 
-    st.subheader("Analysis settings")
+    st.subheader(t("Analysis settings"))
     left, middle, right = st.columns(3)
 
     with left:
         if measures:
             suggested = suggest_main_measure(cleaned_df, roles)
             main_measure = st.selectbox(
-                "Main metric",
+                t("Main metric"),
                 measures,
                 index=measures.index(suggested) if suggested in measures else 0,
                 key=f"generic_measure_{role_signature}",
             )
         else:
             main_measure = None
-            st.info("No numeric column found, so only record counts will be analyzed.")
+            st.info(t("No numeric column found, so only record counts will be analyzed."))
 
     with middle:
         if dates:
             suggested_date = suggest_main_date(cleaned_df, roles)
             main_date = st.selectbox(
-                "Date column",
+                t("Date column"),
                 dates,
                 index=dates.index(suggested_date) if suggested_date in dates else 0,
                 key=f"generic_date_{role_signature}",
             )
         else:
             main_date = None
-            st.info("No date column found, so time trends will be skipped.")
+            st.info(t("No date column found, so time trends will be skipped."))
 
     with right:
         aggregation = st.selectbox(
-            "How to combine values in a group",
+            t("How to combine values in a group"),
             options=["sum", "mean"],
-            format_func=lambda x: "Total (sum)" if x == "sum" else "Average (mean)",
+            format_func=lambda x: t("Total (sum)") if x == "sum" else t("Average (mean)"),
             key=f"generic_agg_{role_signature}",
         )
 
     chosen_dimensions = st.multiselect(
-        "Columns to compare (groups)",
+        t("Columns to compare (groups)"),
         options=dimensions,
         default=dimensions[:MAX_DIMENSIONS],
         key=f"generic_dims_{role_signature}",
@@ -361,23 +363,24 @@ def render_generic_dashboard():
             aggregation=aggregation,
         )
     except Exception as error:
-        st.error(f"Could not calculate the analytics: {error}")
+        st.error(t("Could not calculate the analytics: {error}", error=error))
         return
 
-    st.subheader("Overview")
+    st.subheader(t("Overview"))
     metric_cols = st.columns(3)
-    metric_cols[0].metric("Rows", analytics["overview"]["rows"])
-    metric_cols[1].metric("Columns", analytics["overview"]["columns"])
+    metric_cols[0].metric(t("Rows"), analytics["overview"]["rows"])
+    metric_cols[1].metric(t("Columns"), analytics["overview"]["columns"])
     if main_measure and main_measure in analytics["measures"]:
         stats = analytics["measures"][main_measure]
-        metric_cols[2].metric(f"Total {main_measure}", stats["total"])
+        metric_cols[2].metric(t("Total {name}", name=main_measure), stats["total"])
         st.write(
-            f"{main_measure}: average {stats['average']}, median {stats['median']}, "
-            f"minimum {stats['minimum']}, maximum {stats['maximum']}."
+            t("{name}: average {average}, median {median}, minimum {minimum}, maximum {maximum}.",
+              name=main_measure, average=stats["average"], median=stats["median"],
+              minimum=stats["minimum"], maximum=stats["maximum"])
         )
 
     for dimension in chosen_dimensions[:2]:
-        st.markdown(_md(f"**{main_measure or 'Records'} by {dimension}**"))
+        st.markdown(_md("**" + t("{name} by {group}", name=main_measure or t("Records"), group=dimension) + "**"))
         if main_measure:
             grouped = aggregate_by_group(cleaned_df, dimension, main_measure, aggregation)
         else:
@@ -388,43 +391,43 @@ def render_generic_dashboard():
     if main_date:
         monthly = aggregate_by_period(cleaned_df, main_date, main_measure, aggregation, "M")
         if len(monthly) >= 2:
-            st.markdown(_md(f"**{main_measure or 'Records'} by month**"))
+            st.markdown(_md("**" + t("{name} by month", name=main_measure or t("Records")) + "**"))
             st.line_chart(monthly)
 
-    with st.expander("Calculated facts (what the AI receives)"):
+    with st.expander(t("Calculated facts (what the AI receives)")):
         st.json(convert_to_json_safe(analytics))
 
     # ---- 6. AI insights
     st.divider()
-    st.header("AI Insights")
+    st.header(t("AI Insights"))
 
     status = ai_status()
     goal = ""
     description = ""
     if status["available"]:
         goal = st.text_input(
-            "What do you want to learn? (optional)",
+            t("What do you want to learn? (optional)"),
             key=f"generic_goal_{file_id}",
-            placeholder="For example: which groups should we focus on?",
+            placeholder=t("For example: which groups should we focus on?"),
         )
         description = st.text_input(
-            "Short description of this dataset (optional)",
+            t("Short description of this dataset (optional)"),
             key=f"generic_description_{file_id}",
-            placeholder="For example: monthly support tickets of a software company",
+            placeholder=t("For example: monthly support tickets of a software company"),
         )
     else:
         render_ai_unavailable(status)
 
-    if status["available"] and ai_gate(status, "generic") and st.button("Generate AI Insights", key="generic_generate_ai_btn"):
-        with st.spinner("Generating AI insights..."):
+    if status["available"] and ai_gate(status, "generic") and st.button(t("Generate AI Insights"), key="generic_generate_ai_btn"):
+        with st.spinner(t("Generating AI insights...")):
             try:
                 result = generate_generic_insights(analytics, goal=goal, description=description)
                 st.session_state["generic_ai_result"] = {"file_id": file_id, "result": result}
             except Exception as error:
                 st.session_state.pop("generic_ai_result", None)
-                st.error(f"Error generating AI insights: {error}")
+                st.error(t("Error generating AI insights: {error}", error=error))
 
     stored = st.session_state.get("generic_ai_result")
     if stored and stored["file_id"] == file_id:
-        st.caption("Generated from the settings you had when you clicked the button.")
+        st.caption(t("Generated from the settings you had when you clicked the button."))
         render_insights(stored["result"])

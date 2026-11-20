@@ -8,6 +8,7 @@ from src.ai.insight_generator import generate_business_insights
 from src.ai.ai_service import ai_status
 from src.ai.ai_notice import ai_gate, render_ai_unavailable
 from src.feedback.feedback_ui import render_feedback
+from src.i18n import LANGUAGES, detect_browser_language, t
 from src.security.upload_guard import (
     check_file_bytes,
     check_frame,
@@ -28,21 +29,33 @@ st.set_page_config(
     layout="wide"
 )
 
+# Language: starts from the browser's language, and the visitor can change it.
+if "lang" not in st.session_state:
+    st.session_state["lang"] = detect_browser_language()
+st.sidebar.radio(
+    "Language / Idioma",
+    list(LANGUAGES),
+    format_func=LANGUAGES.get,
+    key="lang",
+    horizontal=True,
+)
+
 # Sidebar navigation
-st.sidebar.title("Navigation")
+st.sidebar.title(t("Navigation"))
 page = st.sidebar.radio(
-    "Choose a dashboard",
+    t("Choose a dashboard"),
     ["Business Dashboard", "Generic Dashboard", "Business (classic)"],
+    format_func=t,
     key="main_navigation",
 )
 
-st.sidebar.caption("Free test version. Files are processed in memory and not saved by this app.")
+st.sidebar.caption(t("Free test version. Files are processed in memory and not saved by this app."))
 
 with st.sidebar:
     render_feedback(page)
 
 if page == "Business Dashboard":
-    st.sidebar.info("Upload your sales file and get a plain-language summary, alerts and charts")
+    st.sidebar.info(t("Upload your sales file and get a plain-language summary, alerts and charts"))
 
     from src.business.business_dashboard import render_business_dashboard
 
@@ -50,14 +63,14 @@ if page == "Business Dashboard":
     st.stop()
 
 if page == "Generic Dashboard":
-    st.sidebar.info("Analyze any Excel or CSV dataset, whatever its columns are")
+    st.sidebar.info(t("Analyze any Excel or CSV dataset, whatever its columns are"))
 
     from src.generic.generic_dashboard import render_generic_dashboard
 
     render_generic_dashboard()
     st.stop()
 
-st.sidebar.info("The original business dashboard (fixed column names)")
+st.sidebar.info(t("The original business dashboard (fixed column names)"))
 
 # Dashboard title
 st.title("AI Excel Dashboard")

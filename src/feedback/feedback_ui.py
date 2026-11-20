@@ -7,6 +7,8 @@ Where the answers go (the owner chooses, all optional and free):
 2. Otherwise the answer is appended to feedback_data/feedback.jsonl on the server. On the free
    Streamlit host that file is erased when the app restarts, so use option 1 for the public site.
 3. FEEDBACK_ISSUES_URL (optional): shows a "report on GitHub" link too.
+4. FEEDBACK_EMAIL (optional): shows "you can also write to us" with a mail link. It is read from
+   the secrets, so the address is not written in the public code.
 
 Only what the visitor types here is saved. Their uploaded data is never included.
 """
@@ -20,6 +22,7 @@ from datetime import datetime, timezone
 
 import streamlit as st
 
+from src.i18n import t
 from src.security.upload_guard import neutralize_cell, sanitize_label
 
 FEEDBACK_DIR = os.environ.get("FEEDBACK_DIR", "feedback_data")
@@ -38,6 +41,15 @@ def _setting(name):
         return str(st.secrets.get(name, "") or "")
     except Exception:
         return ""
+
+
+_EMAIL_OK = __import__("re").compile(r"^[^@\s]+@[^@\s]+\.[^@\s]+$")
+
+
+def owner_email():
+    """The owner's address from the settings, or '' when it is missing or not an email."""
+    value = _setting("FEEDBACK_EMAIL").strip()
+    return value if _EMAIL_OK.match(value) and len(value) <= 120 else ""
 
 
 def clean_entry(mood, topic, message, contact, page):
@@ -86,44 +98,48 @@ def store_entry(entry):
 
 def render_feedback(page_name=""):
     """The feedback box, meant for the sidebar."""
-    with st.expander("Send feedback"):
+    with st.expander(t("Send feedback")):
         st.caption(
-            "Tell us what worked and what did not. Please do not write personal data or paste "
-            "your file's contents here."
+            t("Tell us what worked and what did not. Please do not write personal data or paste "
+              "your file's contents here.")
         )
         with st.form("feedback_form", clear_on_submit=True):
-            mood = st.radio("How useful was it?", MOODS, index=None, key="fb_mood")
-            topic = st.selectbox("About", TOPICS, key="fb_topic")
+            mood = st.radio(t("How useful was it?"), MOODS, index=None, key="fb_mood", format_func=t)
+            topic = st.selectbox(t("About"), TOPICS, key="fb_topic", format_func=t)
             message = st.text_area(
-                "Your feedback",
+                t("Your feedback"),
                 max_chars=MAX_MESSAGE,
                 height=110,
                 key="fb_message",
-                placeholder="What did you try? What would make it better?",
+                placeholder=t("What did you try? What would make it better?"),
             )
             contact = st.text_input(
-                "Email, only if you want a reply (optional)",
+                t("Email, only if you want a reply (optional)"),
                 max_chars=MAX_CONTACT,
                 key="fb_contact",
             )
-            sent = st.form_submit_button("Send")
+            sent = st.form_submit_button(t("Send"))
 
         if sent:
             last = st.session_state.get("fb_last_sent", 0)
             if time.time() - last < MIN_SECONDS_BETWEEN:
-                st.warning("Thanks! Please wait a few seconds before sending another one.")
+                st.warning(t("Thanks! Please wait a few seconds before sending another one."))
             else:
                 entry = clean_entry(mood, topic, message, contact, page_name)
                 if entry is None:
-                    st.warning("Please write a message first.")
+                    st.warning(t("Please write a message first."))
                 else:
                     ok, _where = store_entry(entry)
                     if ok:
                         st.session_state["fb_last_sent"] = time.time()
-                        st.success("Thank you! Your feedback was sent.")
+                        st.success(t("Thank you! Your feedback was sent."))
                     else:
-                        st.error("Sorry, your feedback could not be sent. Please try again later.")
+                        st.error(t("Sorry, your feedback could not be sent. Please try again later."))
 
         issues_url = _setting("FEEDBACK_ISSUES_URL")
         if issues_url.lower().startswith("https://"):
-            st.markdown(f"[Or report it on GitHub]({issues_url})")
+            st.markdown(f"[{t('Or report it on GitHub')}]({issues_url})")
+
+        email = owner_email()
+        if email:
+            st.markdown(t("You can also write to us: {email}", email=f"[{email}](mailto:{email})"))

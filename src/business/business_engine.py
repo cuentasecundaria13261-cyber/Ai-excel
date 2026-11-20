@@ -13,6 +13,7 @@ import numpy as np
 import pandas as pd
 
 from src.generic import generic_analysis as ga
+from src.i18n import is_spanish, t
 
 # Fields the page understands. "revenue" is the money coming in.
 FIELDS = ["revenue", "date", "product", "category", "region", "order_id", "quantity", "unit_price"]
@@ -63,24 +64,37 @@ _ASSIGN_ORDER = ["date", "quantity", "unit_price", "order_id", "revenue", "produ
 # Formatting helpers (plain language)
 # --------------------------------------------------------------------------
 
+def _local_separators(text):
+    """Spanish style: 12.345,67 instead of 12,345.67."""
+    if is_spanish():
+        return text.replace(",", "\x00").replace(".", ",").replace("\x00", ".")
+    return text
+
+
 def fmt_number(value):
-    """Readable number: 12,345 or 12,345.67. Returns 'n/a' for missing values."""
+    """Readable number: 12,345 or 12,345.67 (12.345,67 in Spanish). Missing values give 'n/a'."""
     if value is None or (isinstance(value, float) and np.isnan(value)):
-        return "n/a"
+        return t("n/a")
     value = float(value)
     if abs(value) >= 100 or value == int(value):
-        return f"{value:,.0f}"
-    return f"{value:,.2f}"
+        return _local_separators(f"{value:,.0f}")
+    return _local_separators(f"{value:,.2f}")
 
 
 def fmt_pct(value, signed=True):
     if value is None or (isinstance(value, float) and np.isnan(value)):
-        return "n/a"
-    return f"{value:+.1f}%" if signed else f"{value:.1f}%"
+        return t("n/a")
+    return _local_separators(f"{value:+.1f}%" if signed else f"{value:.1f}%")
+
+
+_MONTHS_ES = ["ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic"]
 
 
 def _date_text(value):
-    return pd.Timestamp(value).strftime("%b %d, %Y")
+    stamp = pd.Timestamp(value)
+    if is_spanish():
+        return f"{stamp.day} {_MONTHS_ES[stamp.month - 1]} {stamp.year}"
+    return stamp.strftime("%b %d, %Y")
 
 
 # --------------------------------------------------------------------------
@@ -171,20 +185,20 @@ def prepare_frame(df, mapping):
     if "revenue" not in work:
         if "quantity" in work and "unit_price" in work:
             work["revenue"] = work["quantity"] * work["unit_price"]
-            notes.append("There is no revenue column, so revenue = units sold x price per unit.")
+            notes.append(t("There is no revenue column, so revenue = units sold x price per unit."))
         else:
             work["revenue"] = 1.0
             metric_label = "Records"
             notes.append(
-                "No money column was found, so each row counts as one record. "
-                "Pick a revenue column above for money totals."
+                t("No money column was found, so each row counts as one record. "
+                  "Pick a revenue column above for money totals.")
             )
 
     if "date" in work:
         work["date"] = ga._ensure_datetime(work["date"])
         bad = int(work["date"].isna().sum())
         if bad:
-            notes.append(f"{bad} row(s) have no usable date and are left out of trends.")
+            notes.append(t("{bad} row(s) have no usable date and are left out of trends.", bad=bad))
 
     for field in ("product", "category", "region", "order_id"):
         if field in work:
@@ -194,13 +208,13 @@ def prepare_frame(df, mapping):
         duplicated = work.duplicated(keep="first")
         if duplicated.any():
             work = work[~duplicated]
-            notes.append(f"Removed {int(duplicated.sum())} exact duplicate row(s) (same order number and values).")
+            notes.append(t("Removed {count} exact duplicate row(s) (same order number and values).", count=int(duplicated.sum())))
     else:
         copies = int(work.duplicated().sum())
         if copies:
             notes.append(
-                f"{copies} row(s) are identical to another row. They were kept because "
-                "there is no order number to prove they are duplicates."
+                t("{copies} row(s) are identical to another row. They were kept because "
+                  "there is no order number to prove they are duplicates.", copies=copies)
             )
 
     return work.reset_index(drop=True), notes, metric_label
@@ -256,8 +270,8 @@ def split_periods(work):
         "length_days": length,
         "current": current,
         "previous": previous,
-        "current_label": f"{_date_text(current_start)} to {_date_text(last)}",
-        "previous_label": f"{_date_text(previous_start)} to {_date_text(previous_end)}",
+        "current_label": t("{start} to {end}", start=_date_text(current_start), end=_date_text(last)),
+        "previous_label": t("{start} to {end}", start=_date_text(previous_start), end=_date_text(previous_end)),
     }
 
 
@@ -322,7 +336,10 @@ def _daily_totals(work):
 def build_alerts(work, periods=None, comparison=None, metric_label="Revenue", max_alerts=8):
     """Detect things an owner should look at. Every alert is plain text with exact numbers."""
     alerts = []
-    label = metric_label.lower()
+    disp = t(metric_label)       # "Revenue" -> "Ingresos" in Spanish
+    label = disp.lower()
+    days = periods["length_days"] if periods else 0
+    names = {"metric_label": disp, "label": label, "days": days}
 
     # --- overall movement
     if comparison:
@@ -330,19 +347,16 @@ def build_alerts(work, periods=None, comparison=None, metric_label="Revenue", ma
         if change is not None:
             current = comparison["current"]["revenue"]
             previous = comparison["previous"]["revenue"]
-            span = f"{periods['length_days']} days"
+            lower_text = t("In the last {days} days, {label} was {current}, {pct} lower than the {days} days before ({previous}).",
+                           **names, current=fmt_number(current), pct=fmt_pct(abs(change), signed=False), previous=fmt_number(previous))
             if change <= -30:
-                alerts.append(_alert("high", f"{metric_label} fell sharply",
-                    f"In the last {span}, {label} was {fmt_number(current)}, "
-                    f"{fmt_pct(abs(change), signed=False)} lower than the {span} before ({fmt_number(previous)})."))
+                alerts.append(_alert("high", t("{metric_label} fell sharply", **names), lower_text))
             elif change <= -15:
-                alerts.append(_alert("medium", f"{metric_label} is going down",
-                    f"In the last {span}, {label} was {fmt_number(current)}, "
-                    f"{fmt_pct(abs(change), signed=False)} lower than the {span} before ({fmt_number(previous)})."))
+                alerts.append(_alert("medium", t("{metric_label} is going down", **names), lower_text))
             elif change >= 25:
-                alerts.append(_alert("info", f"{metric_label} is growing strongly",
-                    f"In the last {span}, {label} was {fmt_number(current)}, "
-                    f"{fmt_pct(change, signed=False)} higher than the {span} before ({fmt_number(previous)})."))
+                alerts.append(_alert("info", t("{metric_label} is growing strongly", **names),
+                    t("In the last {days} days, {label} was {current}, {pct} higher than the {days} days before ({previous}).",
+                      **names, current=fmt_number(current), pct=fmt_pct(change, signed=False), previous=fmt_number(previous))))
 
     # --- groups that stopped selling or dropped a lot
     if periods:
@@ -353,7 +367,6 @@ def build_alerts(work, periods=None, comparison=None, metric_label="Revenue", ma
         fall_limit = -30.0 if overall is None or overall >= 0 else min(-30.0, overall - 15.0)
         group_drops = 0
         product_stopped = False
-        plurals = {"product": "products", "region": "regions", "category": "categories"}
         for field, noun in (("product", "product"), ("region", "region"), ("category", "category")):
             if field not in work or previous_total <= 0 or previous_rows_total == 0:
                 continue
@@ -367,11 +380,19 @@ def build_alerts(work, periods=None, comparison=None, metric_label="Revenue", ma
             stopped = relevant[relevant["current"] <= 0]
             # A category that stopped is usually the same news as its stopped product.
             if not stopped.empty and not (field == "category" and product_stopped):
-                names = ", ".join(str(n) for n in stopped.index[:3])
-                extra = f" and {len(stopped) - 3} more" if len(stopped) > 3 else ""
-                who = f"This {noun} sold" if len(stopped) == 1 else f"These {plurals[noun]} sold"
-                alerts.append(_alert("high", f"No sales at all for: {names}{extra}",
-                    f"{who} before but had no sales in the last {periods['length_days']} days."))
+                who_names = ", ".join(str(n) for n in stopped.index[:3])
+                extra = t(" and {more} more", more=len(stopped) - 3) if len(stopped) > 3 else ""
+                many = len(stopped) > 1
+                if noun == "product":
+                    detail = t("These products sold before but had no sales in the last {days} days.", **names) if many \
+                        else t("This product sold before but had no sales in the last {days} days.", **names)
+                elif noun == "region":
+                    detail = t("These regions sold before but had no sales in the last {days} days.", **names) if many \
+                        else t("This region sold before but had no sales in the last {days} days.", **names)
+                else:
+                    detail = t("These categories sold before but had no sales in the last {days} days.", **names) if many \
+                        else t("This category sold before but had no sales in the last {days} days.", **names)
+                alerts.append(_alert("high", t("No sales at all for: {names}{extra}", names=who_names, extra=extra), detail))
                 if field == "product":
                     product_stopped = True
 
@@ -385,9 +406,16 @@ def build_alerts(work, periods=None, comparison=None, metric_label="Revenue", ma
                 if group_drops >= 3:
                     break
                 group_drops += 1
-                alerts.append(_alert("medium", f"{noun.capitalize()} '{name}' dropped a lot",
-                    f"{metric_label} went from {fmt_number(row['previous'])} to {fmt_number(row['current'])} "
-                    f"({fmt_pct(row['change_pct'])}) compared with the previous {periods['length_days']} days."))
+                if noun == "product":
+                    drop_title = t("Product '{name}' dropped a lot", name=name)
+                elif noun == "region":
+                    drop_title = t("Region '{name}' dropped a lot", name=name)
+                else:
+                    drop_title = t("Category '{name}' dropped a lot", name=name)
+                alerts.append(_alert("medium", drop_title,
+                    t("{metric_label} went from {previous} to {current} ({pct}) compared with the previous {days} days.",
+                      **names, previous=fmt_number(row['previous']), current=fmt_number(row['current']),
+                      pct=fmt_pct(row['change_pct']))))
 
     # --- unusual days (robust to a few big days)
     daily = _daily_totals(work)
@@ -400,11 +428,15 @@ def build_alerts(work, periods=None, comparison=None, metric_label="Revenue", ma
             unusual = unusual.reindex(unusual.abs().sort_values(ascending=False).index)
             for day in unusual.index[:3]:
                 value = daily[day]
-                direction = "much higher" if value > median else "much lower"
                 severity = "info" if value > median else "medium"
-                alerts.append(_alert(severity, f"Unusual day: {_date_text(day)}",
-                    f"{metric_label} that day was {fmt_number(value)}, {direction} than a typical day "
-                    f"with sales (about {fmt_number(median)})."))
+                text_key = (
+                    t("{metric_label} that day was {value}, much higher than a typical day with sales (about {typical}).",
+                      **names, value=fmt_number(value), typical=fmt_number(median))
+                    if value > median else
+                    t("{metric_label} that day was {value}, much lower than a typical day with sales (about {typical}).",
+                      **names, value=fmt_number(value), typical=fmt_number(median))
+                )
+                alerts.append(_alert(severity, t("Unusual day: {date}", date=_date_text(day)), text_key))
 
     # --- dependence on one product / region
     for field, noun in (("product", "product"), ("region", "region")):
@@ -412,19 +444,24 @@ def build_alerts(work, periods=None, comparison=None, metric_label="Revenue", ma
         if len(totals) >= 2 and totals.sum() > 0 and (totals >= 0).all():
             share = float(totals.iloc[0] / totals.sum() * 100)
             if share >= 50:
-                alerts.append(_alert("medium", f"Most {label} depends on one {noun}",
-                    f"'{totals.index[0]}' brings {fmt_pct(share, signed=False)} of all {label}."))
+                depend_title = (
+                    t("Most {label} depends on one product", **names) if noun == "product"
+                    else t("Most {label} depends on one region", **names)
+                )
+                alerts.append(_alert("medium", depend_title,
+                    t("'{name}' brings {pct} of all {label}.", **names, name=totals.index[0],
+                      pct=fmt_pct(share, signed=False))))
 
     # --- data problems
     negatives = int((work["revenue"] < 0).sum())
     if negatives and metric_label == "Revenue":
-        alerts.append(_alert("info", "Some sales are negative",
-            f"{negatives} row(s) have negative {label} (returns, refunds or typing mistakes)."))
+        alerts.append(_alert("info", t("Some sales are negative"),
+            t("{count} row(s) have negative {label} (returns, refunds or typing mistakes).", **names, count=negatives)))
     if "date" in work:
         missing_dates = int(work["date"].isna().sum())
         if missing_dates:
-            alerts.append(_alert("info", "Some rows have no date",
-                f"{missing_dates} row(s) were left out of the time charts and comparisons."))
+            alerts.append(_alert("info", t("Some rows have no date"),
+                t("{count} row(s) were left out of the time charts and comparisons.", count=missing_dates)))
 
     alerts.sort(key=lambda item: _SEVERITY_ORDER[item["severity"]])
     return alerts[:max_alerts]
@@ -436,50 +473,57 @@ def build_alerts(work, periods=None, comparison=None, metric_label="Revenue", ma
 
 def build_summary(work, kpis, periods=None, comparison=None, alerts=None, metric_label="Revenue"):
     """A few plain sentences, written by Python so they are always exact."""
-    label = metric_label.lower()
+    label = t(metric_label).lower()
     lines = []
 
     counting_records = metric_label == "Records"
-    noun = "orders" if "order_id" in work else "records"
+    has_orders = "order_id" in work
+    count = fmt_number(kpis["orders"])
+    money = fmt_number(kpis["revenue"])
     if "date" in work and work["date"].notna().any():
-        start, end = work["date"].min(), work["date"].max()
+        start, end = _date_text(work["date"].min()), _date_text(work["date"].max())
         if counting_records:
-            lines.append(f"From {_date_text(start)} to {_date_text(end)} there are {fmt_number(kpis['orders'])} records.")
+            lines.append(t("From {start} to {end} there are {count} records.", start=start, end=end, count=count))
+        elif has_orders:
+            lines.append(t("From {start} to {end} there were {count} orders and {money} in {label}.",
+                           start=start, end=end, count=count, money=money, label=label))
         else:
-            lines.append(
-                f"From {_date_text(start)} to {_date_text(end)} there were {fmt_number(kpis['orders'])} "
-                f"{noun} and {fmt_number(kpis['revenue'])} in {label}."
-            )
+            lines.append(t("From {start} to {end} there were {count} records and {money} in {label}.",
+                           start=start, end=end, count=count, money=money, label=label))
     elif counting_records:
-        lines.append(f"There are {fmt_number(kpis['orders'])} records.")
+        lines.append(t("There are {count} records.", count=count))
+    elif has_orders:
+        lines.append(t("There are {count} orders with {money} in {label}.", count=count, money=money, label=label))
     else:
-        lines.append(f"There are {fmt_number(kpis['orders'])} {noun} with {fmt_number(kpis['revenue'])} in {label}.")
+        lines.append(t("There are {count} records with {money} in {label}.", count=count, money=money, label=label))
 
     if comparison:
         change = comparison["change_pct"].get("revenue")
         n = periods["length_days"]
         if change is None:
-            lines.append(f"In the last {n} days {label} was {fmt_number(comparison['current']['revenue'])}; "
-                         f"there is nothing in the {n} days before to compare with.")
+            lines.append(t("In the last {n} days {label} was {current}; there is nothing in the {n} days before to compare with.",
+                           n=n, label=label, current=fmt_number(comparison['current']['revenue'])))
         else:
-            direction = "up" if change >= 0 else "down"
-            lines.append(
-                f"In the last {n} days {label} was {fmt_number(comparison['current']['revenue'])}, "
-                f"{direction} {fmt_pct(abs(change), signed=False)} compared with the {n} days before "
-                f"({fmt_number(comparison['previous']['revenue'])})."
+            key = (
+                "In the last {n} days {label} was {current}, up {pct} compared with the {n} days before ({previous})."
+                if change >= 0 else
+                "In the last {n} days {label} was {current}, down {pct} compared with the {n} days before ({previous})."
             )
+            lines.append(t(key, n=n, label=label, current=fmt_number(comparison['current']['revenue']),
+                           pct=fmt_pct(abs(change), signed=False), previous=fmt_number(comparison['previous']['revenue'])))
 
     for field, noun in (("product", "product"), ("region", "region")):
         totals = group_totals(work, field)
         if not totals.empty and totals.sum() > 0 and (totals >= 0).all():
             share = float(totals.iloc[0] / totals.sum() * 100)
-            lines.append(f"Best {noun}: {totals.index[0]} ({fmt_pct(share, signed=False)} of {label}).")
+            best_key = "Best product: {name} ({pct} of {label})." if noun == "product" else "Best region: {name} ({pct} of {label})."
+            lines.append(t(best_key, name=totals.index[0], pct=fmt_pct(share, signed=False), label=label))
 
     urgent = [a for a in (alerts or []) if a["severity"] in ("high", "medium")]
     if urgent:
-        lines.append(f"{len(urgent)} thing(s) need your attention - see the alerts below.")
+        lines.append(t("{count} thing(s) need your attention - see the alerts below.", count=len(urgent)))
     elif alerts is not None:
-        lines.append("Nothing unusual was detected.")
+        lines.append(t("Nothing unusual was detected."))
 
     return lines
 
@@ -511,7 +555,7 @@ def chart_by_weekday(work):
     if valid.empty:
         return None
     totals = valid.groupby(valid["date"].dt.dayofweek)["revenue"].sum().reindex(range(7)).fillna(0.0)
-    names = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"]
+    names = [t("Mon"), t("Tue"), t("Wed"), t("Thu"), t("Fri"), t("Sat"), t("Sun")]
     # The number keeps the bars in week order inside Streamlit charts.
     totals.index = [f"{i + 1}-{names[i]}" for i in range(7)]
     return totals

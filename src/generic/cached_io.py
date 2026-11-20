@@ -10,12 +10,12 @@ import streamlit as st
 from src.generic import generic_analysis as ga
 
 
-@st.cache_data(max_entries=2, ttl=900, show_spinner="Reading your file...")
+@st.cache_data(max_entries=2, ttl=900, show_spinner=False)
 def read_cached(file_bytes, filename, sheet_name=None, header_row=0):
     return ga.read_any_file(file_bytes, filename, sheet_name, header_row)
 
 
-@st.cache_data(max_entries=2, ttl=900, show_spinner="Tidying your data...")
+@st.cache_data(max_entries=2, ttl=900, show_spinner=False)
 def clean_cached(
     df,
     remove_duplicates=True,
@@ -23,6 +23,7 @@ def clean_cached(
     parse_dates=True,
     missing_strategy="keep",
     date_order="auto",
+    language="en",     # part of the cache key, so the notes follow the chosen language
 ):
     return ga.clean_dataset(
         df,

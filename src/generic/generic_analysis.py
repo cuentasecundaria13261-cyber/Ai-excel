@@ -12,6 +12,7 @@ import zipfile
 
 import pandas as pd
 
+from src.i18n import t
 from src.security import upload_guard as _guard
 
 ROLES = ["measure", "dimension", "date", "id", "text", "ignore"]
@@ -47,7 +48,7 @@ def _check_excel_archive(file_bytes):
         with zipfile.ZipFile(io.BytesIO(file_bytes)) as archive:
             entries = archive.infolist()
     except zipfile.BadZipFile as error:
-        raise ValueError("This does not look like a valid Excel (.xlsx) file.") from error
+        raise ValueError(t("This does not look like a valid Excel (.xlsx) file.")) from error
 
     unpacked = sum(entry.file_size for entry in entries)
     packed = sum(entry.compress_size for entry in entries) or 1
@@ -55,21 +56,22 @@ def _check_excel_archive(file_bytes):
     suspicious = unpacked > 20 * 1024 * 1024 and unpacked / packed > _MAX_PACK_RATIO
     if too_big or suspicious:
         raise ValueError(
-            "This Excel file is too large or unusual to open safely in the free test version. "
-            "Try saving it again with fewer rows, or without images."
+            t("This Excel file is too large or unusual to open safely in the free test version. "
+              "Try saving it again with fewer rows, or without images.")
         )
 
 
 def _enforce_limits(df):
     if len(df) > MAX_ROWS:
         raise ValueError(
-            f"This file has more than {MAX_ROWS:,} rows. The free test version handles up to "
-            f"{MAX_ROWS:,} rows. Please upload a smaller file, for example one period at a time."
+            t("This file has more than {limit} rows. The free test version handles up to "
+              "{limit} rows. Please upload a smaller file, for example one period at a time.",
+              limit=f"{MAX_ROWS:,}")
         )
     if df.shape[1] > MAX_COLUMNS:
         raise ValueError(
-            f"This file has more than {MAX_COLUMNS} columns. The free test version handles up to "
-            f"{MAX_COLUMNS} columns."
+            t("This file has more than {limit} columns. The free test version handles up to "
+              "{limit} columns.", limit=MAX_COLUMNS)
         )
     return df
 
@@ -104,7 +106,7 @@ def read_any_file(file_bytes, filename, sheet_name=None, header_row=0):
                 return _enforce_limits(df)
             except UnicodeDecodeError as error:
                 last_error = error
-        raise ValueError(f"Could not decode the CSV file: {last_error}")
+        raise ValueError(t("Could not decode the CSV file: {error}", error=last_error))
 
     if name.endswith((".xlsx", ".xlsm")):
         _check_excel_archive(file_bytes)
@@ -116,7 +118,7 @@ def read_any_file(file_bytes, filename, sheet_name=None, header_row=0):
         )
         return _enforce_limits(df)
 
-    raise ValueError("Unsupported file type. Use .csv, .xlsx or .xlsm.")
+    raise ValueError(t("Unsupported file type. Use .csv, .xlsx or .xlsm."))
 
 
 # --------------------------------------------------------------------------
@@ -349,9 +351,9 @@ def clean_dataset(
     columns_before, rows_before = out.shape[1], out.shape[0]
     out = out.dropna(axis=1, how="all").dropna(axis=0, how="all")
     if out.shape[1] < columns_before:
-        report.append(f"Removed {columns_before - out.shape[1]} completely empty column(s).")
+        report.append(t("Removed {count} completely empty column(s).", count=columns_before - out.shape[1]))
     if out.shape[0] < rows_before:
-        report.append(f"Removed {rows_before - out.shape[0]} completely empty row(s).")
+        report.append(t("Removed {count} completely empty row(s).", count=rows_before - out.shape[0]))
 
     # Convert text columns that are really numbers or dates.
     numeric_columns, date_columns, ambiguous_date_columns = [], [], []
@@ -381,27 +383,27 @@ def clean_dataset(
                     ambiguous_date_columns.append(column)
 
     if numeric_columns:
-        report.append("Converted text to numbers in: " + ", ".join(numeric_columns) + ".")
+        report.append(t("Converted text to numbers in: {columns}.", columns=", ".join(numeric_columns)))
     if date_columns:
-        report.append("Converted text to dates in: " + ", ".join(date_columns) + ".")
+        report.append(t("Converted text to dates in: {columns}.", columns=", ".join(date_columns)))
     if ambiguous_date_columns:
         report.append(
-            "Dates in " + ", ".join(ambiguous_date_columns) + " could be read as "
-            "day/month or month/day; day/month was assumed. Change 'Order of day "
-            "and month' above if that is wrong."
+            t("Dates in {columns} could be read as day/month or month/day; day/month was assumed. "
+              "Change 'Order of day and month' above if that is wrong.",
+              columns=", ".join(ambiguous_date_columns))
         )
 
     if remove_duplicates:
         before = len(out)
         out = out.drop_duplicates()
         if len(out) < before:
-            report.append(f"Removed {before - len(out)} duplicate row(s).")
+            report.append(t("Removed {count} duplicate row(s).", count=before - len(out)))
 
     missing_cells = int(out.isna().sum().sum())
     if missing_strategy == "drop" and missing_cells:
         before = len(out)
         out = out.dropna()
-        report.append(f"Dropped {before - len(out)} row(s) that had missing values.")
+        report.append(t("Dropped {count} row(s) that had missing values.", count=before - len(out)))
     elif missing_strategy == "fill" and missing_cells:
         for column in out.columns:
             if not out[column].isna().any():
@@ -413,14 +415,14 @@ def clean_dataset(
             elif _is_text_like(out[column]):
                 out[column] = out[column].fillna("Unknown")
         report.append(
-            "Filled missing values (median for numbers, 'Unknown' for text; "
-            "dates were left as they are)."
+            t("Filled missing values (median for numbers, 'Unknown' for text; "
+              "dates were left as they are).")
         )
     elif missing_cells:
-        report.append(f"Kept {missing_cells} missing value(s) as they are.")
+        report.append(t("Kept {count} missing value(s) as they are.", count=missing_cells))
 
     if not report:
-        report.append("No cleaning was needed.")
+        report.append(t("No cleaning was needed."))
 
     return out.reset_index(drop=True), report
 
