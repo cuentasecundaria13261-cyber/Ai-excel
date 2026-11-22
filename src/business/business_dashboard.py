@@ -79,10 +79,11 @@ def _read_uploads(uploads):
     return combined, notes, "|".join(file_parts)
 
 
-def _bar(series, title):
+def _bar(series, title, value_name, axis_name):
     st.markdown(f"**{_md(title)}**")
     chart = series.astype(float).copy()
-    chart.index = [str(name) for name in chart.index]
+    chart.index = pd.Index([str(name) for name in chart.index], name=axis_name)
+    chart.name = value_name   # axis text follows the chosen language
     st.bar_chart(chart, color="#2f6feb")
 
 
@@ -164,7 +165,14 @@ def render_business_dashboard():
 
     needs_attention = guess["revenue"] is None and not (guess["quantity"] and guess["unit_price"])
 
-    with st.expander(t("Check your columns"), expanded=needs_attention):
+    # One Settings box holds everything technical, so the page shows only what matters.
+    # It opens by itself when the app could not find the money column.
+    with st.expander(t("Settings"), expanded=needs_attention):
+        tab_cols, tab_filters, tab_clean, tab_details = st.tabs(
+            [t("Columns"), t("Filters"), t("Cleaning"), t("Details")]
+        )
+
+    with tab_cols:
         st.caption(t("Wrong guess? Change it. Only the money column is required."))
         options = [NONE_OPTION] + columns
         mapping = {}
@@ -180,16 +188,16 @@ def render_business_dashboard():
             )
             mapping[field] = None if choice == NONE_OPTION else choice
 
-        chosen = [c for c in mapping.values() if c]
-        if len(chosen) != len(set(chosen)):
-            st.warning(t("The same column is used for two different things. Check your choices."))
+    chosen = [c for c in mapping.values() if c]
+    if len(chosen) != len(set(chosen)):
+        st.warning(t("The same column is used for two different things. Check your choices."))
 
     work_all, prep_notes, metric_label = be.prepare_frame(cleaned, mapping)
     if work_all.empty:
         st.error(t("There is no data to analyze after matching the columns."))
         return
 
-    with st.expander(t("What we cleaned")):
+    with tab_clean:
         for line in [*read_notes, *clean_report, *privacy_notes, *prep_notes]:
             st.write(f"- {_md(line)}")
         st.write("- " + t("{read} rows read, {used} rows used.", read=len(raw_df), used=len(work_all)))
@@ -199,7 +207,7 @@ def render_business_dashboard():
     date_range = None
     regions = categories = products = None
 
-    with st.expander(t("Filters")):
+    with tab_filters:
         if "date" in work_all and work_all["date"].notna().any():
             low, high = work_all["date"].min().date(), work_all["date"].max().date()
             picked = st.date_input(
@@ -230,7 +238,7 @@ def render_business_dashboard():
     work = be.apply_filters(work_all, date_range, regions, categories, products)
     filters_text = "; ".join(filter_parts)
     if work.empty:
-        st.warning(t("No rows match these filters. Clear a filter above."))
+        st.warning(t("No rows match these filters. Clear a filter in Settings."))
         return
 
     # ---- 4. Calculate everything
@@ -250,16 +258,21 @@ def render_business_dashboard():
         return be.fmt_pct(value), ("up" if value > 0 else "down" if value < 0 else None)
 
     spec = [
-        (t("Total {label}", label=t(metric_label).lower()), be.fmt_number(kpis["revenue"]), "money", "revenue"),
-        (t("Orders") if "order_id" in work else t("Records"), be.fmt_number(kpis["orders"]), "bag", "orders"),
-        (t("Average per order"), be.fmt_number(kpis["average_order_value"]), "tag", "average_order_value"),
+        (t("Total {label}", label=t(metric_label).lower()), be.fmt_number(kpis["revenue"]), "money", "revenue",
+         t("All the money your sales brought in.") if metric_label == "Revenue" else t("How many rows of data there are.")),
+        (t("Orders") if "order_id" in work else t("Records"), be.fmt_number(kpis["orders"]), "bag", "orders",
+         t("How many times someone bought something.") if "order_id" in work else t("How many rows of data there are.")),
+        (t("Average per order"), be.fmt_number(kpis["average_order_value"]), "tag", "average_order_value",
+         t("The money from one typical order. Total divided by orders.")),
     ]
     if "units_sold" in kpis:
-        spec.append((t("Units sold"), be.fmt_number(kpis["units_sold"]), "box", "units_sold"))
+        spec.append((t("Units sold"), be.fmt_number(kpis["units_sold"]), "box", "units_sold",
+                     t("How many items were sold, counting each one.")))
     cards = []
-    for label, value, icon_name, key in spec:
+    for label, value, icon_name, key, hint in spec:
         change, direction = change_of(key)
-        cards.append({"label": label, "value": value, "icon": icon_name, "change": change, "direction": direction})
+        cards.append({"label": label, "value": value, "icon": icon_name, "change": change,
+                      "direction": direction, "hint": hint})
     render_steps(1, steps_slot)
     render_kpi_cards(cards)
     if periods:
@@ -282,6 +295,7 @@ def render_business_dashboard():
     # ---- 8. Charts
     render_section(t("Charts"), "chart")
     label = t(metric_label).lower()
+    value_name = t(metric_label)
 
     time_series, time_unit = be.chart_over_time(work)
     products_series = be.top_n(work, "product")
@@ -306,15 +320,24 @@ def render_business_dashboard():
             with tab:
                 if kind == "time":
                     st.markdown("**" + t("How much {label} you made, by {unit}", label=label, unit=t(time_unit)) + "**")
-                    st.line_chart(time_series.astype(float), color="#2f6feb")
+                    line = time_series.astype(float).rename(value_name)
+                    line.index.name = t("Date")
+                    st.caption(t("Each point is one {unit}. A higher point means more {label}.", unit=t(time_unit), label=label))
+                    st.line_chart(line, color="#2f6feb")
                 elif kind == "product":
-                    _bar(products_series, t("Which products bring in the most {label}", label=label))
+                    _bar(products_series, t("Which products bring in the most {label}", label=label), value_name, t("Product"))
+                    st.caption(t("The longest bar is the best seller."))
                 elif kind == "region":
-                    _bar(regions_series, t("Which regions bring in the most {label}", label=label))
+                    _bar(regions_series, t("Which regions bring in the most {label}", label=label), value_name, t("Region"))
+                    st.caption(t("The longest bar is the best place."))
                 elif kind == "category":
-                    _bar(categories_series, t("Which categories bring in the most {label}", label=label))
+                    _bar(categories_series, t("Which categories bring in the most {label}", label=label), value_name, t("Category"))
+                    st.caption(t("The longest bar is the best group."))
                 else:
-                    _bar(weekday_series, t("Which days of the week sell the most ({label})", label=label))
+                    _bar(weekday_series, t("Which days of the week sell the most ({label})", label=label), value_name, t("Day"))
+                    st.caption(t("The longest bar is the best day of the week."))
+        if metric_label == "Revenue":
+            st.caption(t("Revenue = the total of the money column you picked in Settings > Columns, exactly as it is in your file. The app cannot know if it is before or after taxes, discounts or costs."))
     else:
         st.info(t("Match a date, product or region column above to see charts."))
 
@@ -356,7 +379,7 @@ def render_business_dashboard():
             ai_for_report = stored["result"]
         else:
             st.caption(t("This explanation was made for a different file, columns or filters than the ones selected now."))
-        render_insights(stored["result"])
+        render_insights(stored["result"], details=tab_details)
 
     # ---- 10. Download the report
     render_section(t("Take it with you"), "download")

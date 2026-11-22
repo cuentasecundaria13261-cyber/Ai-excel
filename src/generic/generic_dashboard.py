@@ -44,22 +44,28 @@ def _evidence_line(evidence, facts):
     return "; ".join(parts)
 
 
-def _show_evidence(evidence, facts):
-    line = _evidence_line(evidence, facts)
-    if line:
-        st.caption(_md(t("Evidence: {line}", line=line)))
-
-
-def render_insights(result):
-    """Display the AI report, with each claim linked to the facts behind it."""
+def render_insights(result, details=None):
+    """Display the AI report. The technical backing (fact IDs, checks) goes to `details`, if given."""
     insights = result["insights"]
     facts = {fact["id"]: fact for fact in result["fact_catalog"]}
+    evidence_rows = []
 
-    if not result["structure_valid"]:
-        st.warning(t("The AI response had some issues, but it is shown below."))
-        with st.expander(t("Validation issues")):
-            for issue in result["validation_issues"]:
-                st.write(f"- {issue}")
+    def _show_evidence(evidence, facts, label=""):
+        line = _evidence_line(evidence, facts)
+        if line:
+            evidence_rows.append((label, line))
+
+    def _flush_details():
+        if details is None or not (evidence_rows or not result["structure_valid"]):
+            return
+        with details:
+            st.markdown("**" + t("Where the AI's numbers come from") + "**")
+            if not result["structure_valid"]:
+                st.caption(t("The AI response had some issues, but it is shown below."))
+                for issue in result["validation_issues"]:
+                    st.caption(_md(f"- {issue}"))
+            for label, line in evidence_rows:
+                st.caption(_md((f"{label}: " if label else "") + t("Evidence: {line}", line=line)))
 
     if not isinstance(insights, dict):
         st.error(t("The AI did not return a usable report. Please try again."))
@@ -69,7 +75,7 @@ def render_insights(result):
     summary = insights.get("executive_summary")
     if isinstance(summary, dict):
         st.write(_md(summary.get("text", "")))
-        _show_evidence(summary.get("evidence"), facts)
+        _show_evidence(summary.get("evidence"), facts, t("Executive summary"))
     else:
         st.write(t("No summary generated."))
 
@@ -78,7 +84,7 @@ def render_insights(result):
     if observations:
         for obs in observations:
             st.markdown(_md(f"- **{obs.get('category', '')}**: {obs.get('analysis', '')}"))
-            _show_evidence(obs.get("evidence"), facts)
+            _show_evidence(obs.get("evidence"), facts, str(obs.get("category", "")))
     else:
         st.write(t("No significant observations identified."))
 
@@ -89,42 +95,41 @@ def render_insights(result):
             st.markdown(_md("- **" + t("Action") + f"**: {rec.get('action', '')}"))
             st.caption(_md(t("Reason:") + f" {rec.get('reason', '')}"))
             st.caption(_md(t("Caveat:") + f" {rec.get('caveat', '')}"))
-            _show_evidence(rec.get("evidence"), facts)
+            _show_evidence(rec.get("evidence"), facts, str(rec.get("action", ""))[:60])
     else:
         st.write(t("No recommendations at this time."))
 
-    st.subheader(t("Data quality"))
-    quality_items = insights.get("data_quality_interpretation", [])
-    if quality_items:
-        for item in quality_items:
-            st.markdown(_md(f"- **{item.get('title', '')}**: {item.get('explanation', '')}"))
-            _show_evidence(item.get("evidence"), facts)
-    else:
-        st.write(t("No data quality issues identified."))
+    with st.expander(t("More about this answer")):
+        st.subheader(t("Data quality"))
+        quality_items = insights.get("data_quality_interpretation", [])
+        if quality_items:
+            for item in quality_items:
+                st.markdown(_md(f"- **{item.get('title', '')}**: {item.get('explanation', '')}"))
+                _show_evidence(item.get("evidence"), facts, str(item.get("title", "")))
+        else:
+            st.write(t("No data quality issues identified."))
 
-    st.subheader(t("Further analysis opportunities"))
-    further = insights.get("further_analysis_opportunities", [])
-    if further:
-        for item in further:
-            st.markdown(
-                _md(
-                    f"- **{item.get('question', '')}** "
-                    f"({t('needs:')} {item.get('additional_data_required', '')})"
+        st.subheader(t("Further analysis opportunities"))
+        further = insights.get("further_analysis_opportunities", [])
+        if further:
+            for item in further:
+                st.markdown(
+                    _md(
+                        f"- **{item.get('question', '')}** "
+                        f"({t('needs:')} {item.get('additional_data_required', '')})"
+                    )
                 )
-            )
-    else:
-        st.write(t("No further analysis suggestions."))
+        else:
+            st.write(t("No further analysis suggestions."))
 
-    limitations = insights.get("analysis_limitations", [])
-    if limitations:
-        st.subheader(t("Analysis limitations"))
-        for limitation in limitations:
-            st.markdown(_md(f"- {limitation}"))
+        limitations = insights.get("analysis_limitations", [])
+        if limitations:
+            st.subheader(t("Analysis limitations"))
+            for limitation in limitations:
+                st.markdown(_md(f"- {limitation}"))
 
-    st.caption(
-        t("AI-generated from the calculated facts. Check important numbers "
-          "against the tables and charts above.")
-    )
+    st.caption(t("AI can be wrong. Check key numbers."))
+    _flush_details()
 
 
 def render_generic_dashboard():
@@ -154,6 +159,12 @@ def render_generic_dashboard():
         uploaded = sample_upload()
         st.caption(t("Example data. Add your own file above."))
 
+    # Everything technical lives in one box, so the page itself shows only what matters.
+    with st.expander(t("Settings")):
+        tab_file, tab_clean, tab_cols, tab_analysis, tab_details = st.tabs(
+            [t("File"), t("Cleaning"), t("Columns"), t("Analysis"), t("Details")]
+        )
+
     file_bytes = uploaded.getvalue()
     file_id = f"{uploaded.name}:{len(file_bytes)}"
 
@@ -166,11 +177,12 @@ def render_generic_dashboard():
             st.error(t("Could not open the Excel file: {error}", error=error))
             return
         if len(sheets) > 1:
-            sheet_name = st.selectbox(t("Sheet to analyze"), sheets, key=f"generic_sheet_{file_id}")
+            with tab_file:
+                sheet_name = st.selectbox(t("Sheet to analyze"), sheets, key=f"generic_sheet_{file_id}")
         else:
             sheet_name = sheets[0]
 
-    with st.expander(t("Reading options")):
+    with tab_file:
         header_row = int(
             st.number_input(
                 t("Header row (1 = first row of the sheet)"),
@@ -192,15 +204,15 @@ def render_generic_dashboard():
         st.warning(t("The file was read, but it has no data rows."))
         return
 
-    st.success(t("File uploaded and read successfully!"))
     large_note = ug.large_file_note(len(raw_df))
     if large_note:
         st.info(large_note)
-    with st.expander(t("Preview of your file")):
+    with tab_file:
+        st.markdown("**" + t("Preview of your file") + "**")
         st.dataframe(raw_df.head(100))
 
     # ---- 2. Clean
-    with st.expander(t("Cleaning options (optional)")):
+    with tab_clean:
         st.caption(t("The app already chose sensible settings. Only change these if something looks wrong."))
         left, right = st.columns(2)
         with left:
@@ -258,28 +270,29 @@ def render_generic_dashboard():
     if removed_personal:
         report = [*report, t("Removed columns that look like personal data: {columns}.", columns=", ".join(str(c) for c in removed_personal))]
 
-    with st.expander(t("What the cleaning did")):
+    with tab_clean:
+        st.markdown("**" + t("What the cleaning did") + "**")
         for action in report:
             st.write(f"- {action}")
 
-    col1, col2, col3 = st.columns(3)
-    col1.metric(t("Original rows"), len(raw_df))
-    col2.metric(t("Cleaned rows"), len(cleaned_df))
-    col3.metric(t("Columns"), len(cleaned_df.columns))
+        col1, col2, col3 = st.columns(3)
+        col1.metric(t("Original rows"), len(raw_df))
+        col2.metric(t("Cleaned rows"), len(cleaned_df))
+        col3.metric(t("Columns"), len(cleaned_df.columns))
 
-    with st.expander(t("Cleaned dataset preview")):
+        st.markdown("**" + t("Cleaned dataset preview") + "**")
         st.dataframe(cleaned_df.head(100))
 
-    st.download_button(
-        label=t("Download Cleaned CSV"),
-        data=ug.to_safe_csv_bytes(cleaned_df),
-        file_name="cleaned_dataset.csv",
-        mime="text/csv",
-        key=f"generic_download_{file_id}",
-    )
+        st.download_button(
+            label=t("Download Cleaned CSV"),
+            data=ug.to_safe_csv_bytes(cleaned_df),
+            file_name="cleaned_dataset.csv",
+            mime="text/csv",
+            key=f"generic_download_{file_id}",
+        )
 
     # ---- 3. Column roles
-    with st.expander(t("Column roles (optional)")):
+    with tab_cols:
         st.caption(
             t("The app guessed what each column is. Change any that look wrong: "
               "measure = a number to analyze, dimension = a category to group by, "
@@ -311,7 +324,7 @@ def render_generic_dashboard():
 
     role_signature = abs(hash((signature, tuple(sorted(roles.items())))))
 
-    with st.expander(t("Analysis settings (optional)")):
+    with tab_analysis:
         left, middle, right = st.columns(3)
 
         with left:
@@ -395,7 +408,8 @@ def render_generic_dashboard():
             st.markdown(_md("**" + t("{name} by month", name=main_measure or t("Records")) + "**"))
             st.line_chart(monthly, color="#2f6feb")
 
-    with st.expander(t("Calculated facts (what the AI receives)")):
+    with tab_details:
+        st.markdown("**" + t("Calculated facts (what the AI receives)") + "**")
         st.json(convert_to_json_safe(analytics))
 
     # ---- 6. AI insights
@@ -429,5 +443,4 @@ def render_generic_dashboard():
 
     stored = st.session_state.get("generic_ai_result")
     if stored and stored["file_id"] == file_id:
-        st.caption(t("Generated from the settings you had when you clicked the button."))
-        render_insights(stored["result"])
+        render_insights(stored["result"], details=tab_details)

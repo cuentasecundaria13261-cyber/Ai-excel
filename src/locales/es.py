@@ -159,8 +159,46 @@ ES = {
         "Región",
     "Dates: {start} to {end}":
         "Fechas: {start} a {end}",
-    "No rows match these filters. Clear a filter above.":
-        "Ninguna fila cumple estos filtros. Quita un filtro de arriba.",
+    "No rows match these filters. Clear a filter in Settings.":
+        "Ninguna fila cumple estos filtros. Quita un filtro en Ajustes.",
+    "Revenue = the total of the money column you picked in Settings > Columns, exactly as it is in your file. The app cannot know if it is before or after taxes, discounts or costs.":
+        "Ingresos = el total de la columna de dinero que elegiste en Ajustes > Columnas, tal como está en tu archivo. La app no puede saber si es antes o después de impuestos, descuentos o costos.",
+    "Day":
+        "Día",
+    "All the money your sales brought in.":
+        "Todo el dinero que trajeron tus ventas.",
+    "How many rows of data there are.":
+        "Cuántas filas de datos hay.",
+    "How many times someone bought something.":
+        "Cuántas veces alguien compró algo.",
+    "The money from one typical order. Total divided by orders.":
+        "El dinero de un pedido típico. El total dividido entre los pedidos.",
+    "How many items were sold, counting each one.":
+        "Cuántas piezas se vendieron, contando cada una.",
+    "Each point is one {unit}. A higher point means more {label}.":
+        "Cada punto es un/una {unit}. Un punto más alto significa más {label}.",
+    "The longest bar is the best seller.":
+        "La barra más larga es la que más vende.",
+    "The longest bar is the best place.":
+        "La barra más larga es el mejor lugar.",
+    "The longest bar is the best group.":
+        "La barra más larga es el mejor grupo.",
+    "The longest bar is the best day of the week.":
+        "La barra más larga es el mejor día de la semana.",
+    "Settings":
+        "Ajustes",
+    "Cleaning":
+        "Limpieza",
+    "Details":
+        "Detalles",
+    "File":
+        "Archivo",
+    "Analysis":
+        "Análisis",
+    "More about this answer":
+        "Más sobre esta respuesta",
+    "Where the AI's numbers come from":
+        "De dónde salen los números de la IA",
     "What happened":
         "Qué pasó",
     "Filtered: {filters}":

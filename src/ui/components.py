@@ -54,12 +54,13 @@ def kpi_cards_html(items):
             direction = item.get("direction") or "flat"
             arrow = icon("up", 14) if direction == "up" else icon("down", 14) if direction == "down" else ""
             chip = f"<div class='chip {direction}'>{arrow}<span>{esc(change)}</span></div>"
+        hint = f"<div class='kpi-hint'>{esc(item['hint'])}</div>" if item.get("hint") else ""
         cards.append(
             "<div class='kpi'>"
             f"<div class='kpi-icon'>{icon(item.get('icon', 'chart'), 20)}</div>"
             f"<div class='kpi-label'>{esc(item['label'])}</div>"
             f"<div class='kpi-value'>{esc(item['value'])}</div>"
-            f"{chip}</div>"
+            f"{hint}{chip}</div>"
         )
     return "<div class='kpis'>" + "".join(cards) + "</div>"
 

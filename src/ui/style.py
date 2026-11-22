@@ -63,6 +63,7 @@ h3 { font-size:1.08rem !important; font-weight:600 !important; margin-top:1.4rem
             display:flex; align-items:center; justify-content:center; margin-bottom:10px; }
 .kpi-label { color:var(--muted); font-size:.85rem; }
 .kpi-value { font-size:1.75rem; font-weight:650; letter-spacing:-0.02em; line-height:1.2; margin:.1rem 0 .4rem; }
+.kpi-hint { color:var(--muted); font-size:.78rem; line-height:1.3; margin:0 0 .5rem; }
 .chip { display:inline-flex; align-items:center; gap:4px; font-size:.8rem; font-weight:600; padding:2px 9px; border-radius:999px; }
 .chip.up { background:#ecfdf3; color:#067647; }
 .chip.down { background:#fef3f2; color:#b42318; }
