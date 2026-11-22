@@ -23,6 +23,7 @@ from src.generic.generic_analysis import (
 from src.generic.cached_io import clean_cached, read_cached
 from src.generic.generic_insights import generate_generic_insights
 from src.i18n import get_language, t
+from src.ui.components import render_kpi_cards, render_section
 from src.ui.style import render_steps
 
 
@@ -128,15 +129,12 @@ def render_insights(result):
 
 def render_generic_dashboard():
     st.title(t("Any other data"))
-    st.write(
-        t("Upload any Excel or CSV file. The app detects what each column is, "
-          "cleans the data and explains it with AI, whatever the columns are.")
-    )
+    st.write(t("Add any Excel or CSV file. We work out the rest."))
     steps_slot = st.empty()
     render_steps(0, steps_slot)
 
     uploaded = st.file_uploader(
-        t("Choose an Excel or CSV file"),
+        t("Excel or CSV file"),
         type=["csv", "xlsx", "xlsm"],
         key="generic_dataset_uploader",
     )
@@ -147,14 +145,14 @@ def render_generic_dashboard():
     else:
         use_sample = st.session_state.get("generic_use_sample", False)
         if not use_sample:
-            st.info(t("Upload a file to get started."))
-            if st.button(t("Try it with sample data"), key="generic_sample_btn"):
+            st.info(t("Add a file to start."))
+            if st.button(t("Try an example"), key="generic_sample_btn"):
                 st.session_state["generic_use_sample"] = True
                 use_sample = True
         if not use_sample:
             return
         uploaded = sample_upload()
-        st.caption(t("You are looking at made-up sample data. Upload your own file above to analyze it."))
+        st.caption(t("Example data. Add your own file above."))
 
     file_bytes = uploaded.getvalue()
     file_id = f"{uploaded.name}:{len(file_bytes)}"
@@ -372,18 +370,15 @@ def render_generic_dashboard():
         return
 
     render_steps(1, steps_slot)
-    st.header(t("Overview"))
-    metric_cols = st.columns(3)
-    metric_cols[0].metric(t("Rows"), analytics["overview"]["rows"])
-    metric_cols[1].metric(t("Columns"), analytics["overview"]["columns"])
+    cards = [
+        {"label": t("Rows"), "value": f"{analytics['overview']['rows']:,}", "icon": "table"},
+        {"label": t("Columns"), "value": f"{analytics['overview']['columns']:,}", "icon": "list"},
+    ]
     if main_measure and main_measure in analytics["measures"]:
         stats = analytics["measures"][main_measure]
-        metric_cols[2].metric(t("Total {name}", name=main_measure), stats["total"])
-        st.write(
-            t("{name}: average {average}, median {median}, minimum {minimum}, maximum {maximum}.",
-              name=main_measure, average=stats["average"], median=stats["median"],
-              minimum=stats["minimum"], maximum=stats["maximum"])
-        )
+        cards.append({"label": t("Total {name}", name=main_measure), "value": str(stats["total"]), "icon": "money"})
+        cards.append({"label": t("Average"), "value": str(stats["average"]), "icon": "chart"})
+    render_kpi_cards(cards)
 
     for dimension in chosen_dimensions[:2]:
         st.markdown(_md("**" + t("{name} by {group}", name=main_measure or t("Records"), group=dimension) + "**"))
@@ -392,19 +387,19 @@ def render_generic_dashboard():
         else:
             grouped = cleaned_df[dimension].value_counts()
         if not grouped.empty:
-            st.bar_chart(grouped.head(10))
+            st.bar_chart(grouped.head(10), color="#2f6feb")
 
     if main_date:
         monthly = aggregate_by_period(cleaned_df, main_date, main_measure, aggregation, "M")
         if len(monthly) >= 2:
             st.markdown(_md("**" + t("{name} by month", name=main_measure or t("Records")) + "**"))
-            st.line_chart(monthly)
+            st.line_chart(monthly, color="#2f6feb")
 
     with st.expander(t("Calculated facts (what the AI receives)")):
         st.json(convert_to_json_safe(analytics))
 
     # ---- 6. AI insights
-    st.header(t("AI Insights"))
+    render_section(t("AI Insights"), "spark")
 
     status = ai_status()
     goal = ""

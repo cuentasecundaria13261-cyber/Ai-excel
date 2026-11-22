@@ -99,10 +99,7 @@ def store_entry(entry):
 def render_feedback(page_name=""):
     """The feedback box, meant for the sidebar."""
     with st.expander(t("Send feedback")):
-        st.caption(
-            t("Tell us what worked and what did not. Please do not write personal data or paste "
-              "your file's contents here.")
-        )
+        st.caption(t("Tell us what to improve. No personal data, please."))
         with st.form("feedback_form", clear_on_submit=True):
             mood = st.radio(t("How useful was it?"), MOODS, index=None, key="fb_mood", format_func=t)
             topic = st.selectbox(t("About"), TOPICS, key="fb_topic", format_func=t)

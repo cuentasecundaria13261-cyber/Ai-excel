@@ -12,8 +12,7 @@ def _md(text):
 
 def render_privacy_note():
     st.caption(
-        t("Free test version: your file is processed in memory during your visit and this app does not "
-          "save it. Please do not upload personal data or files you are not allowed to share.")
+        t("Your file is not saved. Please do not upload personal data.")
     )
 
 

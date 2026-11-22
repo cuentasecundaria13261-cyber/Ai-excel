@@ -55,6 +55,54 @@ h3 { font-size:1.08rem !important; font-weight:600 !important; margin-top:1.4rem
 .step.now .n { background:var(--accent); border-color:var(--accent); color:#fff; }
 .step.done .n { background:#e8f0fe; border-color:#bcd0fb; color:var(--accent); }
 .step + .step::before { content:""; width:1.4rem; height:1px; background:var(--line); margin-right:.45rem; }
+
+/* big number cards */
+.kpis { display:grid; grid-template-columns:repeat(auto-fit,minmax(170px,1fr)); gap:12px; margin:.4rem 0 1rem; }
+.kpi { background:#fff; border:1px solid var(--line); border-radius:16px; padding:16px 18px; box-shadow:0 1px 2px rgba(16,24,40,.04); }
+.kpi-icon { width:36px; height:36px; border-radius:10px; background:#eaf1fe; color:var(--accent);
+            display:flex; align-items:center; justify-content:center; margin-bottom:10px; }
+.kpi-label { color:var(--muted); font-size:.85rem; }
+.kpi-value { font-size:1.75rem; font-weight:650; letter-spacing:-0.02em; line-height:1.2; margin:.1rem 0 .4rem; }
+.chip { display:inline-flex; align-items:center; gap:4px; font-size:.8rem; font-weight:600; padding:2px 9px; border-radius:999px; }
+.chip.up { background:#ecfdf3; color:#067647; }
+.chip.down { background:#fef3f2; color:#b42318; }
+.chip.flat { background:var(--soft); color:var(--muted); }
+
+/* alert cards: colour and icon say how urgent it is */
+.alert-card { display:flex; gap:12px; align-items:flex-start; border-radius:14px; padding:14px 16px; margin:.5rem 0; border:1px solid; }
+.alert-card.high { background:#fef3f2; border-color:#fecdca; color:#912018; }
+.alert-card.medium { background:#fffaeb; border-color:#fedf89; color:#93370d; }
+.alert-card.info { background:#eff8ff; border-color:#b2ddff; color:#175cd3; }
+.alert-card.ok { background:#ecfdf3; border-color:#abefc6; color:#067647; }
+.alert-icon { flex:none; margin-top:1px; }
+.alert-title { font-weight:600; }
+.alert-detail { font-size:.9rem; opacity:.85; margin-top:2px; }
+
+/* the story: one headline, small lines below */
+.story { background:var(--soft); border-radius:16px; padding:18px 20px; margin:.4rem 0 1rem; }
+.story-head { font-size:1.15rem; font-weight:600; line-height:1.45; }
+.story ul { margin:.6rem 0 0; padding-left:1.1rem; color:#454c5c; }
+
+/* section titles with an icon */
+.section { display:flex; align-items:center; gap:10px; font-size:1.3rem; font-weight:600; margin:2.2rem 0 .6rem; }
+.section-icon { width:30px; height:30px; border-radius:9px; background:#eaf1fe; color:var(--accent);
+                display:inline-flex; align-items:center; justify-content:center; }
+
+/* the empty-state: three big pictures */
+.hero-steps { display:grid; grid-template-columns:repeat(3,1fr); gap:12px; margin:1rem 0 1.4rem; }
+.hero-step { border:1px solid var(--line); border-radius:16px; padding:18px 12px; text-align:center; background:#fff; }
+.hero-step .hi { width:52px; height:52px; border-radius:50%; background:#eaf1fe; color:var(--accent);
+                 display:flex; align-items:center; justify-content:center; margin:0 auto 10px; }
+.hero-step .ht { font-weight:600; }
+.hero-step .hn { color:var(--muted); font-size:.8rem; margin-bottom:2px; }
+@media (max-width:640px) {
+  .kpis { grid-template-columns:1fr 1fr; }
+  .kpi-value { font-size:1.4rem; }
+  .hero-steps { gap:8px; }
+  .hero-step { padding:12px 6px; }
+  .hero-step .hi { width:40px; height:40px; }
+  .hero-step .ht { font-size:.8rem; }
+}
 </style>
 """
 
@@ -64,8 +112,23 @@ def apply_style():
     st.markdown(_CSS, unsafe_allow_html=True)
 
 
+def hero_steps_html():
+    """Three big pictures for the empty page: add, read, share."""
+    from src.ui.components import icon
+
+    items = [("upload", t("Add your file")), ("chart", t("Read the results")), ("download", t("Save or share"))]
+    cards = "".join(
+        f"<div class='hero-step'><div class='hi'>{icon(name, 26)}</div>"
+        f"<div class='hn'>{index}</div><div class='ht'>{html.escape(label)}</div></div>"
+        for index, (name, label) in enumerate(items, start=1)
+    )
+    return f"<div class='hero-steps'>{cards}</div>"
+
+
 def steps_html(active):
-    """The strip "1 Add your file - 2 Read the results - 3 Save or share". `active` is 0, 1 or 2."""
+    """With nothing uploaded: three big pictures. Afterwards: a small strip. `active` is 0, 1 or 2."""
+    if active == 0:
+        return hero_steps_html()
     labels = [t("Add your file"), t("Read the results"), t("Save or share")]
     parts = []
     for index, label in enumerate(labels):

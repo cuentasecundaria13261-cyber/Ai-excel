@@ -63,13 +63,13 @@ page = st.sidebar.radio(
     label_visibility="collapsed",
 )
 _PAGE_HELP = {
-    "Business Dashboard": "For sales files: dates, products and money. Everything is detected for you.",
-    "Generic Dashboard": "For any other table. The app works out what each column is.",
+    "Business Dashboard": "Dates, products and money.",
+    "Generic Dashboard": "Any Excel or CSV table.",
     "Business (classic)": "The original business dashboard (fixed column names)",
 }
 st.sidebar.caption(t(_PAGE_HELP[page]))
 st.sidebar.divider()
-st.sidebar.caption(t("Free test version. Files are processed in memory and not saved by this app."))
+st.sidebar.caption(t("Free test. Your files are not saved."))
 
 with st.sidebar:
     render_feedback(page)

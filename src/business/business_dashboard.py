@@ -18,6 +18,9 @@ from src.generic.cached_io import clean_cached, read_cached
 from src.generic.generic_dashboard import render_insights
 from src.generic.generic_insights import generate_generic_insights
 from src.i18n import get_language, t
+from src.ui.components import (
+    render_alert_card, render_kpi_cards, render_ok_card, render_section, render_summary,
+)
 from src.ui.style import render_steps
 from src.security import upload_guard as ug
 from src.security.privacy_ui import apply_personal_data_choice, render_privacy_note
@@ -80,30 +83,21 @@ def _bar(series, title):
     st.markdown(f"**{_md(title)}**")
     chart = series.astype(float).copy()
     chart.index = [str(name) for name in chart.index]
-    st.bar_chart(chart)
+    st.bar_chart(chart, color="#2f6feb")
 
 
 def _show_alert(alert):
-    text = f"**{_md(alert['title'])}**  \n{_md(alert['detail'])}"
-    if alert["severity"] == "high":
-        st.error(text)
-    elif alert["severity"] == "medium":
-        st.warning(text)
-    else:
-        st.info(text)
+    render_alert_card(alert["severity"], alert["title"], alert["detail"])
 
 
 def render_business_dashboard():
     st.title(t("Sales analysis"))
-    st.write(
-        t("Upload your sales file. We tidy it, draw the charts and tell you what needs "
-          "your attention - no Excel skills needed.")
-    )
+    st.write(t("Add your sales file and see what matters."))
     steps_slot = st.empty()
     render_steps(0, steps_slot)
 
     uploads = st.file_uploader(
-        t("Choose one or more Excel or CSV files"),
+        t("Excel or CSV files"),
         type=["csv", "xlsx", "xlsm"],
         accept_multiple_files=True,
         key="business_uploader",
@@ -114,14 +108,14 @@ def render_business_dashboard():
     else:
         use_sample = st.session_state.get("biz_use_sample", False)
         if not use_sample:
-            st.info(t("Upload a file to get started. Any column names work - we match them for you."))
-            if st.button(t("Try it with sample data"), key="biz_sample_btn"):
+            st.info(t("Any column names work."))
+            if st.button(t("Try an example"), key="biz_sample_btn"):
                 st.session_state["biz_use_sample"] = True
                 use_sample = True
         if not use_sample:
             return
         uploads = [sample_upload()]
-        st.caption(t("You are looking at made-up sample data. Upload your own file above to analyze it."))
+        st.caption(t("Example data. Add your own file above."))
 
     # ---- 1. Read and tidy automatically
     try:
@@ -170,8 +164,8 @@ def render_business_dashboard():
 
     needs_attention = guess["revenue"] is None and not (guess["quantity"] and guess["unit_price"])
 
-    with st.expander(t("We matched your columns - check them"), expanded=needs_attention):
-        st.caption(t("Change a choice if we guessed wrong. Only the money column is really needed."))
+    with st.expander(t("Check your columns"), expanded=needs_attention):
+        st.caption(t("Wrong guess? Change it. Only the money column is required."))
         options = [NONE_OPTION] + columns
         mapping = {}
         pickers = st.columns(2)
@@ -195,7 +189,7 @@ def render_business_dashboard():
         st.error(t("There is no data to analyze after matching the columns."))
         return
 
-    with st.expander(t("What we tidied in your file")):
+    with st.expander(t("What we cleaned")):
         for line in [*read_notes, *clean_report, *privacy_notes, *prep_notes]:
             st.write(f"- {_md(line)}")
         st.write("- " + t("{read} rows read, {used} rows used.", read=len(raw_df), used=len(work_all)))
@@ -205,7 +199,7 @@ def render_business_dashboard():
     date_range = None
     regions = categories = products = None
 
-    with st.expander(t("Filter your data (optional)")):
+    with st.expander(t("Filters")):
         if "date" in work_all and work_all["date"].notna().any():
             low, high = work_all["date"].min().date(), work_all["date"].max().date()
             picked = st.date_input(
@@ -246,54 +240,47 @@ def render_business_dashboard():
     alerts = be.build_alerts(work, periods, comparison, metric_label)
     summary_lines = be.build_summary(work, kpis, periods, comparison, alerts, metric_label)
 
-    # ---- 5. What happened
+    # ---- Key numbers (first, as big cards)
+    changes = comparison["change_pct"] if comparison else {}
+
+    def change_of(key):
+        value = changes.get(key)
+        if value is None:
+            return None, None
+        return be.fmt_pct(value), ("up" if value > 0 else "down" if value < 0 else None)
+
+    spec = [
+        (t("Total {label}", label=t(metric_label).lower()), be.fmt_number(kpis["revenue"]), "money", "revenue"),
+        (t("Orders") if "order_id" in work else t("Records"), be.fmt_number(kpis["orders"]), "bag", "orders"),
+        (t("Average per order"), be.fmt_number(kpis["average_order_value"]), "tag", "average_order_value"),
+    ]
+    if "units_sold" in kpis:
+        spec.append((t("Units sold"), be.fmt_number(kpis["units_sold"]), "box", "units_sold"))
+    cards = []
+    for label, value, icon_name, key in spec:
+        change, direction = change_of(key)
+        cards.append({"label": label, "value": value, "icon": icon_name, "change": change, "direction": direction})
     render_steps(1, steps_slot)
-    st.header(t("What happened"))
+    render_kpi_cards(cards)
+    if periods:
+        st.caption(t("Change vs the {days} days before", days=periods["length_days"]))
+
+    # ---- 5. What happened
+    render_section(t("What happened"), "list")
     if filters_text:
         st.caption(_md(t("Filtered: {filters}", filters=filters_text)))
-    for line in summary_lines:
-        st.markdown(_md(f"- {line}"))
+    render_summary(summary_lines)
 
     # ---- 6. Alerts
-    st.subheader(t("Things to look at"))
-    st.caption(t("Red = act now · Yellow = look at it soon · Blue = good to know"))
+    render_section(t("Things to look at"), "alert")
     if alerts:
         for alert in alerts:
             _show_alert(alert)
     else:
-        st.success(t("Nothing unusual was detected."))
-
-    # ---- 7. Key numbers
-    st.subheader(t("Key numbers"))
-    changes = comparison["change_pct"] if comparison else {}
-
-    def delta(key):
-        value = changes.get(key)
-        return None if value is None else f"{be.fmt_pct(value)} " + t("vs previous period")
-
-    items = [
-        (t("Total {label}", label=t(metric_label).lower()), be.fmt_number(kpis["revenue"]), delta("revenue")),
-        (t("Orders") if "order_id" in work else t("Records"), be.fmt_number(kpis["orders"]), delta("orders")),
-        (t("Average per order"), be.fmt_number(kpis["average_order_value"]), delta("average_order_value")),
-    ]
-    if "units_sold" in kpis:
-        items.append((t("Units sold"), be.fmt_number(kpis["units_sold"]), delta("units_sold")))
-
-    cards = st.columns(len(items))
-    for column, (label, value, change) in zip(cards, items):
-        column.metric(label, value, delta=change)
-
-    if periods:
-        st.caption(
-            t("Changes compare the last {days} days ({current}) with the {days} days before ({previous}).",
-              days=periods["length_days"], current=periods["current_label"], previous=periods["previous_label"])
-        )
-    else:
-        st.caption(t("There is not enough dated data to compare periods."))
+        render_ok_card(t("Nothing unusual was detected."))
 
     # ---- 8. Charts
-    st.subheader(t("Charts"))
-    st.caption(t("Click a tab to change the chart."))
+    render_section(t("Charts"), "chart")
     label = t(metric_label).lower()
 
     time_series, time_unit = be.chart_over_time(work)
@@ -319,7 +306,7 @@ def render_business_dashboard():
             with tab:
                 if kind == "time":
                     st.markdown("**" + t("How much {label} you made, by {unit}", label=label, unit=t(time_unit)) + "**")
-                    st.line_chart(time_series.astype(float))
+                    st.line_chart(time_series.astype(float), color="#2f6feb")
                 elif kind == "product":
                     _bar(products_series, t("Which products bring in the most {label}", label=label))
                 elif kind == "region":
@@ -332,11 +319,8 @@ def render_business_dashboard():
         st.info(t("Match a date, product or region column above to see charts."))
 
     # ---- 9. AI explanation
-    st.header(t("Explain it to me (AI)"))
-    st.caption(
-        t("The AI reads the numbers above and explains them in plain words. "
-          "It can make mistakes, so check anything important against the numbers.")
-    )
+    render_section(t("Explain it to me (AI)"), "spark")
+    st.caption(t("AI can be wrong. Check key numbers."))
     status = ai_status()
     goal = ""
     if status["available"]:
@@ -375,8 +359,7 @@ def render_business_dashboard():
         render_insights(stored["result"])
 
     # ---- 10. Download the report
-    st.header(t("Take it with you"))
-    st.caption(t("Share the report with your team, or keep a copy of your tidied data."))
+    render_section(t("Take it with you"), "download")
 
     charts_for_report = {
         t("Best products"): products_series,
@@ -404,7 +387,7 @@ def render_business_dashboard():
     left, right = st.columns(2)
     html_report = br.build_report_html(time_series=time_series, time_unit=time_unit, **report_args)
     left.download_button(
-        t("Download report (web page)"),
+        t("Download report"),
         data=html_report.encode("utf-8"),
         file_name="business_report.html",
         mime="text/html",
@@ -419,7 +402,7 @@ def render_business_dashboard():
 
     if pdf_bytes:
         right.download_button(
-            t("Download report (PDF)"),
+            t("Download PDF"),
             data=pdf_bytes,
             file_name="business_report.pdf",
             mime="application/pdf",
@@ -427,12 +410,11 @@ def render_business_dashboard():
         )
     elif not br.pdf_available():
         right.caption(
-            t("For a PDF file: open the web page report and choose Print, then Save as PDF. "
-              "Or install the optional package with: pip install reportlab")
+            t("PDF is not available here. Open the report and choose Print, then Save as PDF.")
         )
 
     st.download_button(
-        t("Download the tidied data (CSV)"),
+        t("Download data (CSV)"),
         data=ug.to_safe_csv_bytes(cleaned),
         file_name="cleaned_dataset.csv",
         mime="text/csv",
