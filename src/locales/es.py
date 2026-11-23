@@ -185,6 +185,8 @@ ES = {
         "La barra más larga es el mejor grupo.",
     "The longest bar is the best day of the week.":
         "La barra más larga es el mejor día de la semana.",
+    "The longest bar is the biggest.":
+        "La barra más larga es la más grande.",
     "Settings":
         "Ajustes",
     "Cleaning":

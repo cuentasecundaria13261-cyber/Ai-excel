@@ -117,3 +117,53 @@ def section_title_html(text, icon_name):
 
 def render_section(text, icon_name):
     st.markdown(section_title_html(text, icon_name), unsafe_allow_html=True)
+
+
+def bar_chart_html(items, title="", hint=""):
+    """Clean horizontal bars. items: list of (name, value, value_text). The longest bar is the biggest value."""
+    items = list(items)[:12]
+    top = max([v for _, v, _ in items if v is not None] + [0]) or 1
+    rows = []
+    for name, value, text in items:
+        width = max(0.0, min(100.0, (value or 0) / top * 100))
+        rows.append(
+            "<div class='bar-row'>"
+            f"<div class='bar-name' title='{esc(name)}'>{esc(name)}</div>"
+            f"<div class='bar-track'><div class='bar-fill' style='width:{width:.1f}%'></div></div>"
+            f"<div class='bar-value'>{esc(text)}</div></div>"
+        )
+    head = f"<div class='bar-title'>{esc(title)}</div>" if title else ""
+    foot = f"<div class='bar-hint'>{icon('info', 16)}<span>{esc(hint)}</span></div>" if hint else ""
+    return f"<div class='bars'>{head}{''.join(rows)}{foot}</div>"
+
+
+def render_bar_chart(items, title="", hint=""):
+    st.markdown(bar_chart_html(items, title, hint), unsafe_allow_html=True)
+
+
+def ai_answer_html(headline):
+    """The main AI answer, as one clean card."""
+    return (
+        "<div class='ai-card'>"
+        f"<div class='ai-tag'>{icon('spark', 16)}<span>AI</span></div>"
+        f"<div class='ai-text'>{esc(headline)}</div></div>"
+    )
+
+
+def ai_items_html(items, kind="obs"):
+    """items: list of dicts {title, body, note}. Small cards, one per point."""
+    cards = []
+    for item in items:
+        title = f"<div class='ai-item-title'>{esc(item['title'])}</div>" if item.get("title") else ""
+        body = f"<div class='ai-item-body'>{esc(item['body'])}</div>" if item.get("body") else ""
+        note = f"<div class='ai-item-note'>{esc(item['note'])}</div>" if item.get("note") else ""
+        cards.append(f"<div class='ai-item {kind}'><div class='ai-dot'></div><div>{title}{body}{note}</div></div>")
+    return "<div class='ai-items'>" + "".join(cards) + "</div>"
+
+
+def render_ai_answer(headline):
+    st.markdown(ai_answer_html(headline), unsafe_allow_html=True)
+
+
+def render_ai_items(items, kind="obs"):
+    st.markdown(ai_items_html(items, kind), unsafe_allow_html=True)

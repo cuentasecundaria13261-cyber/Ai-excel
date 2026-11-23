@@ -23,7 +23,7 @@ from src.generic.generic_analysis import (
 from src.generic.cached_io import clean_cached, read_cached
 from src.generic.generic_insights import generate_generic_insights
 from src.i18n import get_language, t
-from src.ui.components import render_kpi_cards, render_section
+from src.ui.components import render_bar_chart, render_ai_answer, render_ai_items, render_kpi_cards, render_section
 from src.ui.style import render_steps
 
 
@@ -71,30 +71,32 @@ def render_insights(result, details=None):
         st.error(t("The AI did not return a usable report. Please try again."))
         return
 
-    st.subheader(t("Executive summary"))
+    render_section(t("Executive summary"), "spark")
     summary = insights.get("executive_summary")
     if isinstance(summary, dict):
-        st.write(_md(summary.get("text", "")))
+        render_ai_answer(summary.get("text", ""))
         _show_evidence(summary.get("evidence"), facts, t("Executive summary"))
     else:
         st.write(t("No summary generated."))
 
-    st.subheader(t("Key observations"))
+    render_section(t("Key observations"), "list")
     observations = insights.get("key_performance_observations", [])
     if observations:
+        render_ai_items([{"title": o.get("category", ""), "body": o.get("analysis", "")} for o in observations])
         for obs in observations:
-            st.markdown(_md(f"- **{obs.get('category', '')}**: {obs.get('analysis', '')}"))
             _show_evidence(obs.get("evidence"), facts, str(obs.get("category", "")))
     else:
         st.write(t("No significant observations identified."))
 
-    st.subheader(t("Recommendations"))
+    render_section(t("Recommendations"), "check")
     recommendations = insights.get("business_recommendations", [])
     if recommendations:
+        render_ai_items(
+            [{"title": r.get("action", ""), "body": r.get("reason", ""),
+              "note": (t("Caveat:") + f" {r.get('caveat', '')}") if r.get("caveat") else ""} for r in recommendations],
+            kind="rec",
+        )
         for rec in recommendations:
-            st.markdown(_md("- **" + t("Action") + f"**: {rec.get('action', '')}"))
-            st.caption(_md(t("Reason:") + f" {rec.get('reason', '')}"))
-            st.caption(_md(t("Caveat:") + f" {rec.get('caveat', '')}"))
             _show_evidence(rec.get("evidence"), facts, str(rec.get("action", ""))[:60])
     else:
         st.write(t("No recommendations at this time."))
@@ -394,13 +396,17 @@ def render_generic_dashboard():
     render_kpi_cards(cards)
 
     for dimension in chosen_dimensions[:2]:
-        st.markdown(_md("**" + t("{name} by {group}", name=main_measure or t("Records"), group=dimension) + "**"))
         if main_measure:
             grouped = aggregate_by_group(cleaned_df, dimension, main_measure, aggregation)
         else:
             grouped = cleaned_df[dimension].value_counts()
         if not grouped.empty:
-            st.bar_chart(grouped.head(10), color="#2f6feb")
+            render_bar_chart(
+                [(str(k), float(v), f"{float(v):,.0f}" if abs(float(v)) >= 100 else f"{float(v):,.2f}")
+                 for k, v in grouped.head(10).items()],
+                t("{name} by {group}", name=main_measure or t("Records"), group=dimension),
+                t("The longest bar is the biggest."),
+            )
 
     if main_date:
         monthly = aggregate_by_period(cleaned_df, main_date, main_measure, aggregation, "M")

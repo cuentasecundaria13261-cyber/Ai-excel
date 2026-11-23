@@ -5,6 +5,8 @@ a plain-language summary, alerts, key numbers with comparisons, charts, an
 optional AI explanation and a report you can download.
 """
 
+import re
+
 import pandas as pd
 import streamlit as st
 
@@ -19,7 +21,7 @@ from src.generic.generic_dashboard import render_insights
 from src.generic.generic_insights import generate_generic_insights
 from src.i18n import get_language, t
 from src.ui.components import (
-    render_alert_card, render_kpi_cards, render_ok_card, render_section, render_summary,
+    render_alert_card, render_bar_chart, render_kpi_cards, render_ok_card, render_section, render_summary,
 )
 from src.ui.style import render_steps
 from src.security import upload_guard as ug
@@ -79,12 +81,13 @@ def _read_uploads(uploads):
     return combined, notes, "|".join(file_parts)
 
 
-def _bar(series, title, value_name, axis_name):
-    st.markdown(f"**{_md(title)}**")
-    chart = series.astype(float).copy()
-    chart.index = pd.Index([str(name) for name in chart.index], name=axis_name)
-    chart.name = value_name   # axis text follows the chosen language
-    st.bar_chart(chart, color="#2f6feb")
+def _bar(series, title, value_name, axis_name, hint=""):
+    """Clean bars: name, bar, number. The longest bar is the biggest."""
+    items = []
+    for name, value in series.astype(float).items():
+        shown = re.sub(r"^\d-", "", str(name))   # weekday names carry a sorting number
+        items.append((shown, float(value), be.fmt_number(value)))
+    render_bar_chart(items, title, hint)
 
 
 def _show_alert(alert):
@@ -325,17 +328,17 @@ def render_business_dashboard():
                     st.caption(t("Each point is one {unit}. A higher point means more {label}.", unit=t(time_unit), label=label))
                     st.line_chart(line, color="#2f6feb")
                 elif kind == "product":
-                    _bar(products_series, t("Which products bring in the most {label}", label=label), value_name, t("Product"))
-                    st.caption(t("The longest bar is the best seller."))
+                    _bar(products_series, t("Which products bring in the most {label}", label=label), value_name, t("Product"),
+                         t("The longest bar is the best seller."))
                 elif kind == "region":
-                    _bar(regions_series, t("Which regions bring in the most {label}", label=label), value_name, t("Region"))
-                    st.caption(t("The longest bar is the best place."))
+                    _bar(regions_series, t("Which regions bring in the most {label}", label=label), value_name, t("Region"),
+                         t("The longest bar is the best place."))
                 elif kind == "category":
-                    _bar(categories_series, t("Which categories bring in the most {label}", label=label), value_name, t("Category"))
-                    st.caption(t("The longest bar is the best group."))
+                    _bar(categories_series, t("Which categories bring in the most {label}", label=label), value_name, t("Category"),
+                         t("The longest bar is the best group."))
                 else:
-                    _bar(weekday_series, t("Which days of the week sell the most ({label})", label=label), value_name, t("Day"))
-                    st.caption(t("The longest bar is the best day of the week."))
+                    _bar(weekday_series, t("Which days of the week sell the most ({label})", label=label), value_name, t("Day"),
+                         t("The longest bar is the best day of the week."))
         if metric_label == "Revenue":
             st.caption(t("Revenue = the total of the money column you picked in Settings > Columns, exactly as it is in your file. The app cannot know if it is before or after taxes, discounts or costs."))
     else:
