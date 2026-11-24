@@ -54,12 +54,27 @@ h3 { font-size:1.08rem !important; font-weight:600 !important; margin-top:1.4rem
 .st-key-lang label:has(input:checked) { background:#fff; box-shadow:0 1px 3px rgba(16,24,40,.15); }
 .st-key-lang label:has(input:checked) p { color:var(--accent); }
 
+/* the button that slides the side panel in and out: always visible, easy to hit */
+[data-testid="stSidebarCollapsedControl"], [data-testid="collapsedControl"], [data-testid="stExpandSidebarButton"],
+[data-testid="stSidebarCollapseButton"], [data-testid="stSidebarHeader"] button { visibility:visible !important; opacity:1 !important; }
+[data-testid="stSidebarCollapsedControl"], [data-testid="collapsedControl"] { display:flex !important; top:.7rem; left:.7rem; z-index:1000; }
+[data-testid="stSidebarCollapsedControl"] button, [data-testid="collapsedControl"] button, [data-testid="stExpandSidebarButton"],
+[data-testid="stSidebarCollapseButton"] button {
+  background:#fff !important; border:1px solid var(--line) !important; border-radius:12px !important; color:var(--accent) !important;
+  width:42px; height:42px; box-shadow:0 2px 8px rgba(16,24,40,.12); transition:border-color .15s, transform .15s; }
+[data-testid="stSidebarCollapsedControl"] button:hover, [data-testid="collapsedControl"] button:hover,
+[data-testid="stExpandSidebarButton"]:hover, [data-testid="stSidebarCollapseButton"] button:hover { border-color:var(--accent) !important; transform:scale(1.05); }
+[data-testid="stSidebar"] { transition:transform .3s ease; }
+
 /* page choice: big, clear buttons instead of round radio dots */
 .st-key-main_navigation [role="radiogroup"] { gap:8px !important; }
 .st-key-main_navigation label { width:100%; margin:0 !important; padding:.8rem 1rem; background:#fff; border:1px solid var(--line);
   border-radius:14px; cursor:pointer; transition:border-color .15s, background .15s; }
 .st-key-main_navigation label > div:first-child { display:none !important; }
-.st-key-main_navigation label p { font-size:1rem; font-weight:600; color:#344054; }
+.st-key-main_navigation label { flex-wrap:wrap; align-items:center; }
+.st-key-main_navigation label p { font-size:1rem; font-weight:600; color:#344054; display:flex; align-items:center; gap:.5rem; }
+.st-key-main_navigation label p span[data-testid="stIconMaterial"], .st-key-main_navigation label p [class*="Icon"] { font-size:1.45rem; color:var(--accent); }
+.st-key-main_navigation label [data-testid="stCaptionContainer"], .st-key-main_navigation label small { flex-basis:100%; margin-top:.15rem; color:var(--muted); font-size:.82rem; font-weight:400; }
 .st-key-main_navigation label:hover { border-color:#9bb8f5; }
 .st-key-main_navigation label:has(input:checked) { background:#eaf1fe; border-color:var(--accent); box-shadow:0 0 0 1px var(--accent) inset; }
 .st-key-main_navigation label:has(input:checked) p { color:var(--accent); }

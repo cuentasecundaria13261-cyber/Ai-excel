@@ -63,6 +63,19 @@ RULES FOR NUMBERS AND NAMES:
 5. Keep every text field short: one or two sentences.
 6. If the user gave a goal, focus the observations and recommendations on it.
 
+WRITE FOR A PERSON WHO IS NOT TECHNICAL:
+- Imagine the reader is a shop owner or a student who has never used data tools.
+  Use short, everyday words and explain what the numbers MEAN for them.
+- Do NOT mention technical details: no number of rows or columns, no file or table
+  structure, no column type names, no fact IDs, no variable or path names such as
+  "overview.rows" or "by_group", no words like "dataset", "field", "variable",
+  "schema", "null", "outlier", "correlation coefficient" or "aggregation".
+  Say "your sales", "your products", "your customers" or "your data" instead.
+- Do not describe how big the file is. Start with what happened and what to do.
+- Use column and group names only when they help the reader (for example a product
+  or a region), written the way the reader knows them.
+- Explain any unavoidable technical idea in one simple sentence.
+
 EVIDENCE:
 - Every evidence list must contain real fact IDs from the list above.
   Never invent IDs.
@@ -73,13 +86,13 @@ Use exactly this structure:
 
 {{
   "executive_summary": {{
-    "text": "Two sentences on what the dataset shows, quoting key numbers from the facts.",
+    "text": "Two short, plain sentences on what the numbers mean for the reader, quoting key numbers from the facts. No row or column counts.",
     "evidence": ["<fact id>"]
   }},
   "key_performance_observations": [
     {{
-      "category": "Overview",
-      "analysis": "Size and shape of the dataset and its main metric.",
+      "category": "Big picture",
+      "analysis": "The main number and how it looks overall, in plain words (no file size, no row or column counts).",
       "evidence": ["<fact id>"]
     }},
     {{
@@ -109,7 +122,7 @@ Use exactly this structure:
   "data_quality_interpretation": [
     {{
       "title": "Short issue title",
-      "explanation": "Why this limits the analysis.",
+      "explanation": "Why this limits what we can say, in plain words.",
       "evidence": ["<fact id>"]
     }}
   ],

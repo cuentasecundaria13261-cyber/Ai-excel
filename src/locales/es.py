@@ -187,6 +187,16 @@ ES = {
         "La barra más larga es el mejor día de la semana.",
     "The longest bar is the biggest.":
         "La barra más larga es la más grande.",
+    "Previous chart":
+        "Gráfico anterior",
+    "Next chart":
+        "Gráfico siguiente",
+    "Use the arrows to see the next chart. They also move when you scroll.":
+        "Usa las flechas para ver el siguiente gráfico. También se mueven al hacer scroll.",
+    "A higher point means a bigger number.":
+        "Un punto más alto significa un número más grande.",
+    "Show or hide the side panel":
+        "Mostrar u ocultar el panel lateral",
     "Settings":
         "Ajustes",
     "Cleaning":

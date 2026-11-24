@@ -90,6 +90,14 @@ def fmt_pct(value, signed=True):
 _MONTHS_ES = ["ene", "feb", "mar", "abr", "may", "jun", "jul", "ago", "sep", "oct", "nov", "dic"]
 
 
+def period_text(value, unit):
+    """Short label for a chart point: a day, a week start, or a month."""
+    stamp = pd.Timestamp(value)
+    if unit == "month":
+        return f"{_MONTHS_ES[stamp.month - 1]} {stamp.year}" if is_spanish() else stamp.strftime("%b %Y")
+    return _date_text(stamp)
+
+
 def _date_text(value):
     stamp = pd.Timestamp(value)
     if is_spanish():

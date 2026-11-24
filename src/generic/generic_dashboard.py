@@ -23,7 +23,8 @@ from src.generic.generic_analysis import (
 from src.generic.cached_io import clean_cached, read_cached
 from src.generic.generic_insights import generate_generic_insights
 from src.i18n import get_language, t
-from src.ui.components import render_bar_chart, render_ai_answer, render_ai_items, render_kpi_cards, render_section
+from src.ui.carousel import render_carousel
+from src.ui.components import render_ai_answer, render_ai_items, render_kpi_cards, render_section
 from src.ui.style import render_steps
 
 
@@ -395,24 +396,37 @@ def render_generic_dashboard():
         cards.append({"label": t("Average"), "value": str(stats["average"]), "icon": "chart"})
     render_kpi_cards(cards)
 
+    def _number(value):
+        value = float(value)
+        return f"{value:,.0f}" if abs(value) >= 100 else f"{value:,.2f}"
+
+    slides = []
     for dimension in chosen_dimensions[:2]:
         if main_measure:
             grouped = aggregate_by_group(cleaned_df, dimension, main_measure, aggregation)
         else:
             grouped = cleaned_df[dimension].value_counts()
         if not grouped.empty:
-            render_bar_chart(
-                [(str(k), float(v), f"{float(v):,.0f}" if abs(float(v)) >= 100 else f"{float(v):,.2f}")
-                 for k, v in grouped.head(10).items()],
-                t("{name} by {group}", name=main_measure or t("Records"), group=dimension),
-                t("The longest bar is the biggest."),
-            )
+            slides.append({
+                "name": str(dimension)[:24], "kind": "bars",
+                "title": t("{name} by {group}", name=main_measure or t("Records"), group=dimension),
+                "hint": t("The longest bar is the biggest."),
+                "items": [(str(k), float(v), _number(v)) for k, v in grouped.head(10).items()],
+            })
 
     if main_date:
         monthly = aggregate_by_period(cleaned_df, main_date, main_measure, aggregation, "M")
         if len(monthly) >= 2:
-            st.markdown(_md("**" + t("{name} by month", name=main_measure or t("Records")) + "**"))
-            st.line_chart(monthly, color="#2f6feb")
+            slides.append({
+                "name": t("Over time"), "kind": "line",
+                "title": t("{name} by month", name=main_measure or t("Records")),
+                "hint": t("A higher point means a bigger number."),
+                "points": [(pd.Timestamp(k).strftime("%b %Y") if hasattr(k, "strftime") else str(k), float(v)) for k, v in monthly.items()],
+                "fmt": _number,
+            })
+    if slides:
+        st.caption(t("Use the arrows to see the next chart. They also move when you scroll."))
+        render_carousel(slides)
 
     with tab_details:
         st.markdown("**" + t("Calculated facts (what the AI receives)") + "**")

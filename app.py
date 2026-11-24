@@ -11,6 +11,7 @@ from src.ai.ai_service import ai_status
 from src.ai.ai_notice import ai_gate, render_ai_unavailable
 from src.feedback.feedback_ui import render_feedback
 from src.i18n import LANGUAGES, detect_browser_language, t
+from src.ui.sidebar_toggle import render_sidebar_toggle
 from src.ui.style import apply_style
 from src.security.upload_guard import (
     check_file_bytes,
@@ -33,6 +34,7 @@ st.set_page_config(
 )
 
 apply_style()
+render_sidebar_toggle()
 
 # Language: starts from the browser's language, and the visitor can change it.
 if "lang" not in st.session_state:
@@ -55,19 +57,30 @@ _options = ["Business Dashboard", "Generic Dashboard"]
 if os.environ.get("SHOW_CLASSIC") == "1":
     _options.append("Business (classic)")
 
-page = st.sidebar.radio(
-    t("Choose a dashboard"),
-    _options,
-    format_func=lambda value: t(_PAGES[value]),
-    key="main_navigation",
-    label_visibility="collapsed",
-)
 _PAGE_HELP = {
     "Business Dashboard": "Dates, products and money.",
     "Generic Dashboard": "Any Excel or CSV table.",
     "Business (classic)": "The original business dashboard (fixed column names)",
 }
-st.sidebar.caption(t(_PAGE_HELP[page]))
+_PAGE_ICONS = {
+    "Business Dashboard": ":material/storefront:",
+    "Generic Dashboard": ":material/table_chart:",
+    "Business (classic)": ":material/history:",
+}
+_nav_args = dict(
+    format_func=lambda value: f"{_PAGE_ICONS[value]} {t(_PAGES[value])}",
+    key="main_navigation",
+    label_visibility="collapsed",
+)
+try:
+    # Each choice shows an icon, a title and a short line of help (needs a recent Streamlit).
+    page = st.sidebar.radio(
+        t("Choose a dashboard"), _options,
+        captions=[t(_PAGE_HELP[o]) for o in _options], **_nav_args,
+    )
+except TypeError:
+    page = st.sidebar.radio(t("Choose a dashboard"), _options, **_nav_args)
+    st.sidebar.caption(t(_PAGE_HELP[page]))
 st.sidebar.divider()
 st.sidebar.caption(t("Free test. Your files are not saved."))
 

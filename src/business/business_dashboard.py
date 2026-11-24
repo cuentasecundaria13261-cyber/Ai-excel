@@ -21,8 +21,9 @@ from src.generic.generic_dashboard import render_insights
 from src.generic.generic_insights import generate_generic_insights
 from src.i18n import get_language, t
 from src.ui.components import (
-    render_alert_card, render_bar_chart, render_kpi_cards, render_ok_card, render_section, render_summary,
+    render_alert_card, render_kpi_cards, render_ok_card, render_section, render_summary,
 )
+from src.ui.carousel import render_carousel
 from src.ui.style import render_steps
 from src.security import upload_guard as ug
 from src.security.privacy_ui import apply_personal_data_choice, render_privacy_note
@@ -81,13 +82,13 @@ def _read_uploads(uploads):
     return combined, notes, "|".join(file_parts)
 
 
-def _bar(series, title, value_name, axis_name, hint=""):
-    """Clean bars: name, bar, number. The longest bar is the biggest."""
+def _bar_items(series):
+    """(name, value, text) for each bar. The longest bar is the biggest."""
     items = []
     for name, value in series.astype(float).items():
         shown = re.sub(r"^\d-", "", str(name))   # weekday names carry a sorting number
         items.append((shown, float(value), be.fmt_number(value)))
-    render_bar_chart(items, title, hint)
+    return items
 
 
 def _show_alert(alert):
@@ -306,39 +307,32 @@ def render_business_dashboard():
     categories_series = be.top_n(work, "category")
     weekday_series = be.chart_by_weekday(work)
 
-    tabs_spec = []
+    slides = []
     if time_series is not None and len(time_series) >= 2:
-        tabs_spec.append((t("Over time"), "time"))
-    if products_series is not None:
-        tabs_spec.append((t("Products"), "product"))
-    if regions_series is not None:
-        tabs_spec.append((t("Regions"), "region"))
-    if categories_series is not None:
-        tabs_spec.append((t("Categories"), "category"))
+        slides.append({
+            "name": t("Over time"), "kind": "line",
+            "title": t("How much {label} you made, by {unit}", label=label, unit=t(time_unit)),
+            "hint": t("Each point is one {unit}. A higher point means more {label}.", unit=t(time_unit), label=label),
+            "points": [(be.period_text(day, time_unit), float(v)) for day, v in time_series.items()],
+            "fmt": be.fmt_number,
+        })
+    for name, series, title, hint in (
+        (t("Products"), products_series, t("Which products bring in the most {label}", label=label), t("The longest bar is the best seller.")),
+        (t("Regions"), regions_series, t("Which regions bring in the most {label}", label=label), t("The longest bar is the best place.")),
+        (t("Categories"), categories_series, t("Which categories bring in the most {label}", label=label), t("The longest bar is the best group.")),
+    ):
+        if series is not None:
+            slides.append({"name": name, "kind": "bars", "title": title, "hint": hint, "items": _bar_items(series)})
     if weekday_series is not None and weekday_series.sum() != 0:
-        tabs_spec.append((t("Days of the week"), "weekday"))
+        slides.append({
+            "name": t("Days of the week"), "kind": "bars",
+            "title": t("Which days of the week sell the most ({label})", label=label),
+            "hint": t("The longest bar is the best day of the week."), "items": _bar_items(weekday_series),
+        })
 
-    if tabs_spec:
-        for tab, (_, kind) in zip(st.tabs([name for name, _ in tabs_spec]), tabs_spec):
-            with tab:
-                if kind == "time":
-                    st.markdown("**" + t("How much {label} you made, by {unit}", label=label, unit=t(time_unit)) + "**")
-                    line = time_series.astype(float).rename(value_name)
-                    line.index.name = t("Date")
-                    st.caption(t("Each point is one {unit}. A higher point means more {label}.", unit=t(time_unit), label=label))
-                    st.line_chart(line, color="#2f6feb")
-                elif kind == "product":
-                    _bar(products_series, t("Which products bring in the most {label}", label=label), value_name, t("Product"),
-                         t("The longest bar is the best seller."))
-                elif kind == "region":
-                    _bar(regions_series, t("Which regions bring in the most {label}", label=label), value_name, t("Region"),
-                         t("The longest bar is the best place."))
-                elif kind == "category":
-                    _bar(categories_series, t("Which categories bring in the most {label}", label=label), value_name, t("Category"),
-                         t("The longest bar is the best group."))
-                else:
-                    _bar(weekday_series, t("Which days of the week sell the most ({label})", label=label), value_name, t("Day"),
-                         t("The longest bar is the best day of the week."))
+    if slides:
+        st.caption(t("Use the arrows to see the next chart. They also move when you scroll."))
+        render_carousel(slides)
         if metric_label == "Revenue":
             st.caption(t("Revenue = the total of the money column you picked in Settings > Columns, exactly as it is in your file. The app cannot know if it is before or after taxes, discounts or costs."))
     else:
