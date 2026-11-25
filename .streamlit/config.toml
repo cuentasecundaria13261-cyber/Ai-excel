@@ -9,7 +9,7 @@ gatherUsageStats = false
 # A calm light theme: white page, soft grey panels, one blue accent.
 base = "light"
 primaryColor = "#2F6FEB"
-backgroundColor = "#FFFFFF"
-secondaryBackgroundColor = "#F6F7F9"
+backgroundColor = "#F4F5F8"
+secondaryBackgroundColor = "#FFFFFF"
 textColor = "#1F2430"
 font = "sans serif"

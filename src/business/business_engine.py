@@ -248,6 +248,10 @@ def compute_kpis(work):
     return kpis
 
 
+def _cap(text):
+    return text[:1].upper() + text[1:]
+
+
 def split_periods(work):
     """Latest period vs the one before it, anchored to the last date in the data.
 
@@ -278,6 +282,8 @@ def split_periods(work):
         "length_days": length,
         "current": current,
         "previous": previous,
+        "current_range": t("between {start} and {end}", start=_date_text(current_start), end=_date_text(last)),
+        "previous_range": t("between {start} and {end}", start=_date_text(previous_start), end=_date_text(previous_end)),
         "current_label": t("{start} to {end}", start=_date_text(current_start), end=_date_text(last)),
         "previous_label": t("{start} to {end}", start=_date_text(previous_start), end=_date_text(previous_end)),
     }
@@ -347,7 +353,9 @@ def build_alerts(work, periods=None, comparison=None, metric_label="Revenue", ma
     disp = t(metric_label)       # "Revenue" -> "Ingresos" in Spanish
     label = disp.lower()
     days = periods["length_days"] if periods else 0
-    names = {"metric_label": disp, "label": label, "days": days}
+    names = {"metric_label": disp, "label": label, "days": days,
+             "period": periods["current_range"] if periods else "", "before": periods["previous_range"] if periods else ""}
+    names["Period"] = names["period"][:1].upper() + names["period"][1:]
 
     # --- overall movement
     if comparison:
@@ -355,7 +363,7 @@ def build_alerts(work, periods=None, comparison=None, metric_label="Revenue", ma
         if change is not None:
             current = comparison["current"]["revenue"]
             previous = comparison["previous"]["revenue"]
-            lower_text = t("In the last {days} days, {label} was {current}, {pct} lower than the {days} days before ({previous}).",
+            lower_text = t("{Period}, {label} was {current}, {pct} lower than {before} ({previous}).",
                            **names, current=fmt_number(current), pct=fmt_pct(abs(change), signed=False), previous=fmt_number(previous))
             if change <= -30:
                 alerts.append(_alert("high", t("{metric_label} fell sharply", **names), lower_text))
@@ -363,7 +371,7 @@ def build_alerts(work, periods=None, comparison=None, metric_label="Revenue", ma
                 alerts.append(_alert("medium", t("{metric_label} is going down", **names), lower_text))
             elif change >= 25:
                 alerts.append(_alert("info", t("{metric_label} is growing strongly", **names),
-                    t("In the last {days} days, {label} was {current}, {pct} higher than the {days} days before ({previous}).",
+                    t("{Period}, {label} was {current}, {pct} higher than {before} ({previous}).",
                       **names, current=fmt_number(current), pct=fmt_pct(change, signed=False), previous=fmt_number(previous))))
 
     # --- groups that stopped selling or dropped a lot
@@ -392,14 +400,14 @@ def build_alerts(work, periods=None, comparison=None, metric_label="Revenue", ma
                 extra = t(" and {more} more", more=len(stopped) - 3) if len(stopped) > 3 else ""
                 many = len(stopped) > 1
                 if noun == "product":
-                    detail = t("These products sold before but had no sales in the last {days} days.", **names) if many \
-                        else t("This product sold before but had no sales in the last {days} days.", **names)
+                    detail = t("These products sold before but had no sales {period}.", **names) if many \
+                        else t("This product sold before but had no sales {period}.", **names)
                 elif noun == "region":
-                    detail = t("These regions sold before but had no sales in the last {days} days.", **names) if many \
-                        else t("This region sold before but had no sales in the last {days} days.", **names)
+                    detail = t("These regions sold before but had no sales {period}.", **names) if many \
+                        else t("This region sold before but had no sales {period}.", **names)
                 else:
-                    detail = t("These categories sold before but had no sales in the last {days} days.", **names) if many \
-                        else t("This category sold before but had no sales in the last {days} days.", **names)
+                    detail = t("These categories sold before but had no sales {period}.", **names) if many \
+                        else t("This category sold before but had no sales {period}.", **names)
                 alerts.append(_alert("high", t("No sales at all for: {names}{extra}", names=who_names, extra=extra), detail))
                 if field == "product":
                     product_stopped = True
@@ -421,7 +429,7 @@ def build_alerts(work, periods=None, comparison=None, metric_label="Revenue", ma
                 else:
                     drop_title = t("Category '{name}' dropped a lot", name=name)
                 alerts.append(_alert("medium", drop_title,
-                    t("{metric_label} went from {previous} to {current} ({pct}) compared with the previous {days} days.",
+                    t("{metric_label} went from {previous} to {current} ({pct}) {period}, compared with what it was {before}.",
                       **names, previous=fmt_number(row['previous']), current=fmt_number(row['current']),
                       pct=fmt_pct(row['change_pct']))))
 
@@ -507,17 +515,16 @@ def build_summary(work, kpis, periods=None, comparison=None, alerts=None, metric
 
     if comparison:
         change = comparison["change_pct"].get("revenue")
-        n = periods["length_days"]
         if change is None:
-            lines.append(t("In the last {n} days {label} was {current}; there is nothing in the {n} days before to compare with.",
-                           n=n, label=label, current=fmt_number(comparison['current']['revenue'])))
+            lines.append(t("{Period}, {label} was {current}; there is nothing before that to compare with.",
+                           Period=_cap(periods["current_range"]), label=label, current=fmt_number(comparison['current']['revenue'])))
         else:
             key = (
-                "In the last {n} days {label} was {current}, up {pct} compared with the {n} days before ({previous})."
+                "{Period}, {label} was {current}, up {pct} compared with {before} ({previous})."
                 if change >= 0 else
-                "In the last {n} days {label} was {current}, down {pct} compared with the {n} days before ({previous})."
+                "{Period}, {label} was {current}, down {pct} compared with {before} ({previous})."
             )
-            lines.append(t(key, n=n, label=label, current=fmt_number(comparison['current']['revenue']),
+            lines.append(t(key, Period=_cap(periods["current_range"]), before=periods["previous_range"], label=label, current=fmt_number(comparison['current']['revenue']),
                            pct=fmt_pct(abs(change), signed=False), previous=fmt_number(comparison['previous']['revenue'])))
 
     for field, noun in (("product", "product"), ("region", "region")):

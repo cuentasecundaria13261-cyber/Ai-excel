@@ -407,11 +407,18 @@ def render_generic_dashboard():
         else:
             grouped = cleaned_df[dimension].value_counts()
         if not grouped.empty:
+            shown_total = float(grouped.head(10).sum())
             slides.append({
                 "name": str(dimension)[:24], "kind": "bars",
                 "title": t("{name} by {group}", name=main_measure or t("Records"), group=dimension),
                 "hint": t("The longest bar is the biggest."),
-                "items": [(str(k), float(v), _number(v)) for k, v in grouped.head(10).items()],
+                "items": [
+                    (str(k), float(v), _number(v), [
+                        t("{pct} of the total shown", pct=f"{float(v) / shown_total * 100:.1f}%") if shown_total else "",
+                        t("Number {rank} of {count}", rank=rank, count=min(len(grouped), 10)),
+                    ])
+                    for rank, (k, v) in enumerate(grouped.head(10).items(), start=1)
+                ],
             })
 
     if main_date:
@@ -422,10 +429,15 @@ def render_generic_dashboard():
                 "title": t("{name} by month", name=main_measure or t("Records")),
                 "hint": t("A higher point means a bigger number."),
                 "points": [(pd.Timestamp(k).strftime("%b %Y") if hasattr(k, "strftime") else str(k), float(v)) for k, v in monthly.items()],
+                "tips": [
+                    ([t("Up {pct} from the previous {unit}" if v >= p else "Down {pct} from the previous {unit}",
+                        pct=f"{abs(float(v) - float(p)) / abs(float(p)) * 100:.1f}%", unit=t("month"))] if p else [])
+                    for p, v in zip([None] + [float(x) for x in monthly.values][:-1], [float(x) for x in monthly.values])
+                ],
                 "fmt": _number,
             })
     if slides:
-        st.caption(t("Use the arrows to see the next chart. They also move when you scroll."))
+        st.caption(t("Use the arrows or scroll. The page waits here until you have seen every chart."))
         render_carousel(slides)
 
     with tab_details:

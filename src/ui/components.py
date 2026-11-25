@@ -120,14 +120,19 @@ def render_section(text, icon_name):
 
 
 def bar_chart_html(items, title="", hint=""):
-    """Clean horizontal bars. items: list of (name, value, value_text). The longest bar is the biggest value."""
+    """Clean horizontal bars. items: list of (name, value, value_text) or (name, value, value_text, tip_lines).
+    The longest bar is the biggest value. tip_lines are shown when the visitor hovers over a row."""
+    import json
     items = list(items)[:12]
-    top = max([v for _, v, _ in items if v is not None] + [0]) or 1
+    top = max([item[1] for item in items if item[1] is not None] + [0]) or 1
     rows = []
-    for name, value, text in items:
+    for item in items:
+        name, value, text = item[0], item[1], item[2]
+        tip = item[3] if len(item) > 3 and item[3] else None
         width = max(0.0, min(100.0, (value or 0) / top * 100))
+        tip_attr = f" data-tip='{esc(json.dumps([name] + list(tip), ensure_ascii=False))}'" if tip else ""
         rows.append(
-            "<div class='bar-row'>"
+            f"<div class='bar-row'{tip_attr}>"
             f"<div class='bar-name' title='{esc(name)}'>{esc(name)}</div>"
             f"<div class='bar-track'><div class='bar-fill' style='width:{width:.1f}%'></div></div>"
             f"<div class='bar-value'>{esc(text)}</div></div>"
@@ -167,3 +172,144 @@ def render_ai_answer(headline):
 
 def render_ai_items(items, kind="obs"):
     st.markdown(ai_items_html(items, kind), unsafe_allow_html=True)
+
+
+# ---------------------------------------------------------------------------
+# Dashboard cards: one white card per chart, in a two-column grid (full width on phones)
+# ---------------------------------------------------------------------------
+
+PALETTE = ["#2f6feb", "#c2410c", "#0f766e", "#7c3aed", "#b45309", "#667085"]
+
+
+def dcard_html(title, body, wide=False, hint=""):
+    foot = f"<div class='dsub'>{icon('info', 15)}<span>{esc(hint)}</span></div>" if hint else ""
+    return f"<div class='dcard{' wide' if wide else ''}'><div class='dtitle'>{esc(title)}</div>{body}{foot}</div>"
+
+
+def grid_html(cards):
+    return "<div class='dgrid'>" + "".join(cards) + "</div>"
+
+
+def render_grid(cards):
+    if cards:
+        st.markdown(grid_html(cards), unsafe_allow_html=True)
+
+
+def ranking_body_html(rows):
+    """rows: list of (name, small text under the name, amount text). Numbered, the first one in solid colour."""
+    out = []
+    for index, (name, sub, amount) in enumerate(rows, start=1):
+        small = f"<div class='rk-sub'>{esc(sub)}</div>" if sub else ""
+        out.append(
+            f"<div class='rk-row{' first' if index == 1 else ''}'><div class='rk-n'>{index}</div>"
+            f"<div class='rk-main'><div class='rk-name'>{esc(name)}</div>{small}</div>"
+            f"<div class='rk-amt'>{esc(amount)}</div></div>"
+        )
+    return "".join(out)
+
+
+def share_bars_body_html(rows):
+    """rows: list of (name, amount text, percent number 0-100). Name left, amount and percent right, bar below."""
+    out = []
+    for name, amount, pct in rows:
+        width = max(0.0, min(100.0, float(pct)))
+        out.append(
+            f"<div class='sb-row'><div class='sb-top'><span>{esc(name)}</span><b>{esc(amount)}</b></div>"
+            f"<div class='sb-track'><div class='sb-fill' style='width:{width:.1f}%'></div></div></div>"
+        )
+    return "".join(out)
+
+
+def split_body_html(rows):
+    """rows: list of (name, amount text, percent number). One long bar split in coloured parts, then a legend."""
+    segments, legend = [], []
+    for index, (name, amount, pct) in enumerate(rows):
+        colour = PALETTE[index % len(PALETTE)]
+        if pct >= 1:
+            label = f"{esc(name)} {pct:.0f}%" if pct >= 14 else ""
+            segments.append(f"<div class='sp-seg' style='width:{pct:.2f}%;background:{colour}' title='{esc(name)} {pct:.1f}%'>{label}</div>")
+        legend.append(f"<div class='sp-row'><span><i style='background:{colour}'></i>{esc(name)}</span><b>{esc(amount)}</b></div>")
+    return f"<div class='sp-bar'>{''.join(segments)}</div>{''.join(legend)}"
+
+
+def _nice_top(value):
+    if value <= 0:
+        return 1.0
+    power = 10 ** (len(str(int(value))) - 1) if value >= 1 else 1
+    for step in (1, 2, 2.5, 5, 10):
+        if value <= step * power:
+            return step * power
+    return 10 * power
+
+
+def line_svg_html(points, fmt, tips=None, size=(1000, 300)):
+    """A line chart drawn as SVG. Hover over a point (no script needed) and a small box tells about it.
+    points: list of (label, value); tips: optional list of extra lines per point."""
+    W, H = size
+    pad_l, pad_r, pad_t, pad_b = 78, 22, 16, 36
+    points = [(str(label), float(value)) for label, value in points]
+    if len(points) < 2:
+        return ""
+    top = _nice_top(max(max(v for _, v in points), 0))
+    low = min(min(v for _, v in points), 0)
+    span = (top - low) or 1
+    iw, ih = W - pad_l - pad_r, H - pad_t - pad_b
+
+    def x_of(i):
+        return pad_l + iw * i / (len(points) - 1)
+
+    def y_of(v):
+        return pad_t + ih * (1 - (v - low) / span)
+
+    grid = "".join(
+        f"<line x1='{pad_l}' x2='{W - pad_r}' y1='{y_of(low + span * k / 4):.1f}' y2='{y_of(low + span * k / 4):.1f}' stroke='#eef0f4'/>"
+        f"<text x='{pad_l - 10}' y='{y_of(low + span * k / 4) + 5:.1f}' text-anchor='end' font-size='13' fill='#667085'>{esc(fmt(low + span * k / 4))}</text>"
+        for k in range(5)
+    )
+    path = " ".join(f"{x_of(i):.1f},{y_of(v):.1f}" for i, (_, v) in enumerate(points))
+    base = y_of(max(low, 0))
+    area = f"{x_of(0):.1f},{base:.1f} {path} {x_of(len(points) - 1):.1f},{base:.1f}"
+    ticks = sorted({0, len(points) // 4, len(points) // 2, (3 * len(points)) // 4, len(points) - 1})
+    labels = "".join(
+        f"<text x='{x_of(i):.1f}' y='{H - 10}' text-anchor='{'start' if i == 0 else 'end' if i == len(points) - 1 else 'middle'}'"
+        f" font-size='13' fill='#667085'>{esc(points[i][0])}</text>" for i in ticks)
+    step = iw / (len(points) - 1)
+    hover = []
+    for i, (label, value) in enumerate(points):
+        x, y = x_of(i), y_of(value)
+        lines = [label, fmt(value)] + list((tips[i] if tips else []) or [])
+        box_w = max(len(line) for line in lines) * 7.6 + 26
+        box_h = 14 + 22 * len(lines)
+        bx = x + 14 if x + 14 + box_w < W - 4 else x - 14 - box_w
+        by = max(pad_t + 2, min(y - box_h / 2, H - pad_b - box_h))
+        text = "".join(
+            f"<text x='{bx + 13:.1f}' y='{by + 24 + 22 * n:.1f}' font-size='13' "
+            f"fill='{'#fff' if n < 2 else '#d0d5dd'}' font-weight='{700 if n < 2 else 400}'>{esc(line)}</text>"
+            for n, line in enumerate(lines))
+        hover.append(
+            "<g class='lp'>"
+            f"<rect x='{x - step / 2:.1f}' y='{pad_t}' width='{step:.1f}' height='{ih}' fill='transparent'/>"
+            f"<g class='lp-on'><line x1='{x:.1f}' x2='{x:.1f}' y1='{pad_t}' y2='{pad_t + ih}' stroke='#9bb8f5' stroke-dasharray='4 4'/>"
+            f"<circle cx='{x:.1f}' cy='{y:.1f}' r='6' fill='#2f6feb' stroke='#fff' stroke-width='2.5'/>"
+            f"<rect x='{bx:.1f}' y='{by:.1f}' width='{box_w:.1f}' height='{box_h}' rx='10' fill='#101828'/>{text}</g></g>")
+    dots = "".join(
+        f"<circle cx='{x_of(i):.1f}' cy='{y_of(v):.1f}' r='3.5' fill='#fff' stroke='#2f6feb' stroke-width='2.2'/>"
+        for i, (_, v) in enumerate(points)) if len(points) <= 40 else ""
+    return (
+        f"<svg class='linechart' viewBox='0 0 {W} {H}' width='100%' role='img'>"
+        "<defs><linearGradient id='lgfill' x1='0' y1='0' x2='0' y2='1'><stop offset='0' stop-color='#2f6feb' stop-opacity='.22'/>"
+        "<stop offset='1' stop-color='#2f6feb' stop-opacity='0'/></linearGradient></defs>"
+        f"{grid}<polygon points='{area}' fill='url(#lgfill)'/>"
+        f"<polyline points='{path}' fill='none' stroke='#2f6feb' stroke-width='3.5' stroke-linejoin='round' stroke-linecap='round'/>"
+        f"{dots}{labels}{''.join(hover)}</svg>"
+    )
+
+
+def alert_grid_html(alerts):
+    """alerts: list of dicts {severity, title, detail}. Two columns on a wide screen."""
+    return "<div class='agrid'>" + "".join(alert_card_html(a["severity"], a["title"], a.get("detail", "")) for a in alerts) + "</div>"
+
+
+def render_alert_grid(alerts):
+    if alerts:
+        st.markdown(alert_grid_html(alerts), unsafe_allow_html=True)

@@ -191,12 +191,36 @@ ES = {
         "Gráfico anterior",
     "Next chart":
         "Gráfico siguiente",
-    "Use the arrows to see the next chart. They also move when you scroll.":
-        "Usa las flechas para ver el siguiente gráfico. También se mueven al hacer scroll.",
+    "Use the arrows or scroll. The page waits here until you have seen every chart.":
+        "Usa las flechas o el scroll. La página espera aquí hasta que veas todos los gráficos.",
+    "{pct} of all {label}":
+        "{pct} del total de {label}",
+    "Number {rank} of {count}":
+        "Puesto {rank} de {count}",
+    "Up {pct} from the previous {unit}":
+        "Sube {pct} frente al periodo anterior ({unit})",
+    "Down {pct} from the previous {unit}":
+        "Baja {pct} frente al periodo anterior ({unit})",
+    "The best {unit} in this chart":
+        "El mejor punto de este gráfico ({unit})",
+    "The weakest {unit} in this chart":
+        "El punto más débil de este gráfico ({unit})",
     "A higher point means a bigger number.":
         "Un punto más alto significa un número más grande.",
     "Show or hide the side panel":
         "Mostrar u ocultar el panel lateral",
+    "between {start} and {end}":
+        "entre el {start} y el {end}",
+    "{pct} of the total shown":
+        "{pct} del total mostrado",
+    "Needs attention":
+        "Necesita atención",
+    "Keep an eye on":
+        "Vigila esto",
+    "Download clean data":
+        "Descargar datos limpios",
+    "Others":
+        "Otros",
     "Settings":
         "Ajustes",
     "Cleaning":
@@ -321,34 +345,34 @@ ES = {
         "Los {label} están bajando",
     "{metric_label} is growing strongly":
         "Los {label} están creciendo con fuerza",
-    "In the last {days} days, {label} was {current}, {pct} lower than the {days} days before ({previous}).":
-        "En los últimos {days} días, los {label} fueron {current}, un {pct} menos que en los {days} días anteriores ({previous}).",
-    "In the last {days} days, {label} was {current}, {pct} higher than the {days} days before ({previous}).":
-        "En los últimos {days} días, los {label} fueron {current}, un {pct} más que en los {days} días anteriores ({previous}).",
+    "{Period}, {label} was {current}, {pct} lower than {before} ({previous}).":
+        "{Period}, los {label} fueron {current}, un {pct} menos que {before} ({previous}).",
+    "{Period}, {label} was {current}, {pct} higher than {before} ({previous}).":
+        "{Period}, los {label} fueron {current}, un {pct} más que {before} ({previous}).",
     " and {more} more":
         " y {more} más",
     "No sales at all for: {names}{extra}":
         "Sin ninguna venta: {names}{extra}",
-    "This product sold before but had no sales in the last {days} days.":
-        "Este producto se vendía antes, pero no tuvo ventas en los últimos {days} días.",
-    "These products sold before but had no sales in the last {days} days.":
-        "Estos productos se vendían antes, pero no tuvieron ventas en los últimos {days} días.",
-    "This region sold before but had no sales in the last {days} days.":
-        "Esta región vendía antes, pero no tuvo ventas en los últimos {days} días.",
-    "These regions sold before but had no sales in the last {days} days.":
-        "Estas regiones vendían antes, pero no tuvieron ventas en los últimos {days} días.",
-    "This category sold before but had no sales in the last {days} days.":
-        "Esta categoría vendía antes, pero no tuvo ventas en los últimos {days} días.",
-    "These categories sold before but had no sales in the last {days} days.":
-        "Estas categorías vendían antes, pero no tuvieron ventas en los últimos {days} días.",
+    "This product sold before but had no sales {period}.":
+        "Este producto se vendía antes, pero no tuvo ventas {period}.",
+    "These products sold before but had no sales {period}.":
+        "Estos productos se vendían antes, pero no tuvieron ventas {period}.",
+    "This region sold before but had no sales {period}.":
+        "Esta región vendía antes, pero no tuvo ventas {period}.",
+    "These regions sold before but had no sales {period}.":
+        "Estas regiones vendían antes, pero no tuvieron ventas {period}.",
+    "This category sold before but had no sales {period}.":
+        "Esta categoría vendía antes, pero no tuvo ventas {period}.",
+    "These categories sold before but had no sales {period}.":
+        "Estas categorías vendían antes, pero no tuvieron ventas {period}.",
     "Product '{name}' dropped a lot":
         "El producto '{name}' cayó mucho",
     "Region '{name}' dropped a lot":
         "La región '{name}' cayó mucho",
     "Category '{name}' dropped a lot":
         "La categoría '{name}' cayó mucho",
-    "{metric_label} went from {previous} to {current} ({pct}) compared with the previous {days} days.":
-        "Los {label} pasaron de {previous} a {current} ({pct}) frente a los {days} días anteriores.",
+    "{metric_label} went from {previous} to {current} ({pct}) {period}, compared with what it was {before}.":
+        "Los {label} pasaron de {previous} a {current} ({pct}) {period}, frente a lo que hubo {before}.",
     "Unusual day: {date}":
         "Día inusual: {date}",
     "{metric_label} that day was {value}, much higher than a typical day with sales (about {typical}).":
@@ -381,12 +405,12 @@ ES = {
         "Hay {count} pedidos con {money} en {label}.",
     "There are {count} records with {money} in {label}.":
         "Hay {count} registros con {money} en {label}.",
-    "In the last {n} days {label} was {current}; there is nothing in the {n} days before to compare with.":
-        "En los últimos {n} días los {label} fueron {current}; no hay nada en los {n} días anteriores con qué comparar.",
-    "In the last {n} days {label} was {current}, up {pct} compared with the {n} days before ({previous}).":
-        "En los últimos {n} días los {label} fueron {current}, un {pct} más que en los {n} días anteriores ({previous}).",
-    "In the last {n} days {label} was {current}, down {pct} compared with the {n} days before ({previous}).":
-        "En los últimos {n} días los {label} fueron {current}, un {pct} menos que en los {n} días anteriores ({previous}).",
+    "{Period}, {label} was {current}; there is nothing before that to compare with.":
+        "{Period}, los {label} fueron {current}; no hay nada antes con qué comparar.",
+    "{Period}, {label} was {current}, up {pct} compared with {before} ({previous}).":
+        "{Period}, los {label} fueron {current}, un {pct} más que {before} ({previous}).",
+    "{Period}, {label} was {current}, down {pct} compared with {before} ({previous}).":
+        "{Period}, los {label} fueron {current}, un {pct} menos que {before} ({previous}).",
     "Best product: {name} ({pct} of {label}).":
         "Mejor producto: {name} ({pct} de los {label}).",
     "Best region: {name} ({pct} of {label}).":
@@ -645,8 +669,8 @@ ES = {
         "Qué limpiamos",
     "Filters":
         "Filtros",
-    "Change vs the {days} days before":
-        "Cambio frente a los {days} días anteriores",
+    "Change vs previous period: {before}":
+        "Cambio frente al periodo anterior: {before}",
     "AI can be wrong. Check key numbers.":
         "La IA puede equivocarse. Revisa los números clave.",
     "Download report":

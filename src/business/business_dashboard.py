@@ -21,9 +21,9 @@ from src.generic.generic_dashboard import render_insights
 from src.generic.generic_insights import generate_generic_insights
 from src.i18n import get_language, t
 from src.ui.components import (
-    render_alert_card, render_kpi_cards, render_ok_card, render_section, render_summary,
+    dcard_html, line_svg_html, ranking_body_html, render_alert_grid, render_grid, render_kpi_cards, render_ok_card,
+    render_section, render_summary, share_bars_body_html, split_body_html,
 )
-from src.ui.carousel import render_carousel
 from src.ui.style import render_steps
 from src.security import upload_guard as ug
 from src.security.privacy_ui import apply_personal_data_choice, render_privacy_note
@@ -82,22 +82,39 @@ def _read_uploads(uploads):
     return combined, notes, "|".join(file_parts)
 
 
-def _bar_items(series):
-    """(name, value, text) for each bar. The longest bar is the biggest."""
-    items = []
+def _line_tips(values, unit):
+    """Extra hover lines for each point of the time chart: change from the point before, best and weakest."""
+    tips, top, low = [], max(values), min(values)
+    for i, value in enumerate(values):
+        lines = []
+        if i > 0 and values[i - 1]:
+            change = (value - values[i - 1]) / abs(values[i - 1]) * 100
+            key = "Up {pct} from the previous {unit}" if change >= 0 else "Down {pct} from the previous {unit}"
+            lines.append(t(key, pct=be.fmt_pct(abs(change), signed=False), unit=unit))
+        if value == top and top != low:
+            lines.append(t("The best {unit} in this chart", unit=unit))
+        elif value == low and top != low:
+            lines.append(t("The weakest {unit} in this chart", unit=unit))
+        tips.append(lines)
+    return tips
+
+
+def _share_rows(series, total, label):
+    """(name, amount text, percent of everything) for each group, biggest first."""
+    rows = []
+    total = float(total) if total else float(series.astype(float).sum())
     for name, value in series.astype(float).items():
-        shown = re.sub(r"^\d-", "", str(name))   # weekday names carry a sorting number
-        items.append((shown, float(value), be.fmt_number(value)))
-    return items
-
-
-def _show_alert(alert):
-    render_alert_card(alert["severity"], alert["title"], alert["detail"])
+        pct = float(value) / total * 100 if total else 0.0
+        rows.append((re.sub(r"^\d-", "", str(name)), be.fmt_number(value), pct))
+    return rows
 
 
 def render_business_dashboard():
-    st.title(t("Sales analysis"))
-    st.write(t("Add your sales file and see what matters."))
+    head_left, head_right = st.columns([5, 4])
+    with head_left:
+        st.title(t("Sales analysis"))
+        st.write(t("Add your sales file and see what matters."))
+    actions = head_right.container()   # the download buttons are placed here once the report exists
     steps_slot = st.empty()
     render_steps(0, steps_slot)
 
@@ -280,7 +297,7 @@ def render_business_dashboard():
     render_steps(1, steps_slot)
     render_kpi_cards(cards)
     if periods:
-        st.caption(t("Change vs the {days} days before", days=periods["length_days"]))
+        st.caption(t("Change vs previous period: {before}", before=periods["previous_label"]))
 
     # ---- 5. What happened
     render_section(t("What happened"), "list")
@@ -288,18 +305,9 @@ def render_business_dashboard():
         st.caption(_md(t("Filtered: {filters}", filters=filters_text)))
     render_summary(summary_lines)
 
-    # ---- 6. Alerts
-    render_section(t("Things to look at"), "alert")
-    if alerts:
-        for alert in alerts:
-            _show_alert(alert)
-    else:
-        render_ok_card(t("Nothing unusual was detected."))
-
-    # ---- 8. Charts
+    # ---- 6. Charts: one white card each, side by side on a wide screen
     render_section(t("Charts"), "chart")
     label = t(metric_label).lower()
-    value_name = t(metric_label)
 
     time_series, time_unit = be.chart_over_time(work)
     products_series = be.top_n(work, "product")
@@ -307,36 +315,67 @@ def render_business_dashboard():
     categories_series = be.top_n(work, "category")
     weekday_series = be.chart_by_weekday(work)
 
-    slides = []
-    if time_series is not None and len(time_series) >= 2:
-        slides.append({
-            "name": t("Over time"), "kind": "line",
-            "title": t("How much {label} you made, by {unit}", label=label, unit=t(time_unit)),
-            "hint": t("Each point is one {unit}. A higher point means more {label}.", unit=t(time_unit), label=label),
-            "points": [(be.period_text(day, time_unit), float(v)) for day, v in time_series.items()],
-            "fmt": be.fmt_number,
-        })
-    for name, series, title, hint in (
-        (t("Products"), products_series, t("Which products bring in the most {label}", label=label), t("The longest bar is the best seller.")),
-        (t("Regions"), regions_series, t("Which regions bring in the most {label}", label=label), t("The longest bar is the best place.")),
-        (t("Categories"), categories_series, t("Which categories bring in the most {label}", label=label), t("The longest bar is the best group.")),
-    ):
-        if series is not None:
-            slides.append({"name": name, "kind": "bars", "title": title, "hint": hint, "items": _bar_items(series)})
-    if weekday_series is not None and weekday_series.sum() != 0:
-        slides.append({
-            "name": t("Days of the week"), "kind": "bars",
-            "title": t("Which days of the week sell the most ({label})", label=label),
-            "hint": t("The longest bar is the best day of the week."), "items": _bar_items(weekday_series),
-        })
+    def totals_of(field):
+        return be.group_totals(work, field).sum()
 
-    if slides:
-        st.caption(t("Use the arrows to see the next chart. They also move when you scroll."))
-        render_carousel(slides)
+    def with_share(rows):
+        return [(name, f"{amount} · {be.fmt_pct(pct, signed=False)}", pct) for name, amount, pct in rows]
+
+    cards = []
+    if time_series is not None and len(time_series) >= 2:
+        cards.append(dcard_html(
+            t("How much {label} you made, by {unit}", label=label, unit=t(time_unit)),
+            line_svg_html([(be.period_text(day, time_unit), float(v)) for day, v in time_series.items()], be.fmt_number,
+                          _line_tips([float(v) for v in time_series.values], t(time_unit))),
+            wide=True,
+            hint=t("Each point is one {unit}. A higher point means more {label}.", unit=t(time_unit), label=label),
+        ))
+    if products_series is not None:
+        rows = _share_rows(products_series, totals_of("product"), label)[:8]
+        cards.append(dcard_html(
+            t("Which products bring in the most {label}", label=label),
+            ranking_body_html([(n, t("{pct} of all {label}", pct=be.fmt_pct(p, signed=False), label=label), a) for n, a, p in rows]),
+        ))
+    if regions_series is not None:
+        cards.append(dcard_html(
+            t("Which regions bring in the most {label}", label=label),
+            share_bars_body_html(with_share(_share_rows(regions_series, totals_of("region"), label)[:8])),
+        ))
+    if categories_series is not None:
+        rows = _share_rows(categories_series, totals_of("category"), label)[:4]
+        rest = max(0.0, 100.0 - sum(p for _, _, p in rows))
+        if rest >= 1:
+            rows.append((t("Others"), be.fmt_number(float(totals_of("category")) * rest / 100), rest))
+        cards.append(dcard_html(t("Which categories bring in the most {label}", label=label), split_body_html(rows)))
+    if weekday_series is not None and weekday_series.sum() != 0:
+        cards.append(dcard_html(
+            t("Which days of the week sell the most ({label})", label=label),
+            share_bars_body_html(with_share(_share_rows(weekday_series, None, label))),
+            hint=t("The longest bar is the best day of the week."),
+        ))
+
+    if cards:
+        render_grid(cards)
         if metric_label == "Revenue":
             st.caption(t("Revenue = the total of the money column you picked in Settings > Columns, exactly as it is in your file. The app cannot know if it is before or after taxes, discounts or costs."))
     else:
         st.info(t("Match a date, product or region column above to see charts."))
+
+    # ---- 7. Things to look at: one section for each level of importance
+    sections = (
+        (t("Needs attention"), "alert", [a for a in alerts if a["severity"] == "high"]),
+        (t("Keep an eye on"), "info", [a for a in alerts if a["severity"] == "medium"]),
+        (t("Good to know"), "check", [a for a in alerts if a["severity"] not in ("high", "medium")]),
+    )
+    shown_any = False
+    for title, icon_name, group in sections:
+        if group:
+            shown_any = True
+            render_section(f"{title} ({len(group)})", icon_name)
+            render_alert_grid(group)
+    if not shown_any:
+        render_section(t("Things to look at"), "alert")
+        render_ok_card(t("Nothing unusual was detected."))
 
     # ---- 9. AI explanation
     render_section(t("Explain it to me (AI)"), "spark")
@@ -378,9 +417,7 @@ def render_business_dashboard():
             st.caption(t("This explanation was made for a different file, columns or filters than the ones selected now."))
         render_insights(stored["result"], details=tab_details)
 
-    # ---- 10. Download the report
-    render_section(t("Take it with you"), "download")
-
+    # ---- 8. The download buttons, at the top right of the page
     charts_for_report = {
         t("Best products"): products_series,
         t("Regions"): regions_series,
@@ -404,39 +441,35 @@ def render_business_dashboard():
         filters_text=filters_text,
     )
 
-    left, right = st.columns(2)
-    html_report = br.build_report_html(time_series=time_series, time_unit=time_unit, **report_args)
-    left.download_button(
-        t("Download report"),
-        data=html_report.encode("utf-8"),
-        file_name="business_report.html",
-        mime="text/html",
-        key=f"biz_dl_html_{file_sig}",
-    )
-
     pdf_bytes = None
     try:
         pdf_bytes = br.build_report_pdf(**report_args)
-    except Exception as error:
-        right.caption(t("The PDF could not be created: {error}", error=error))
+    except Exception:
+        pdf_bytes = None   # the HTML report below always works
 
-    if pdf_bytes:
-        right.download_button(
-            t("Download PDF"),
-            data=pdf_bytes,
-            file_name="business_report.pdf",
-            mime="application/pdf",
-            key=f"biz_dl_pdf_{file_sig}",
+    with actions:
+        data_col, report_col = st.columns(2)
+        data_col.download_button(
+            t("Download clean data"),
+            data=ug.to_safe_csv_bytes(cleaned),
+            file_name="cleaned_dataset.csv",
+            mime="text/csv",
+            key=f"biz_dl_csv_{file_sig}",
         )
-    elif not br.pdf_available():
-        right.caption(
-            t("PDF is not available here. Open the report and choose Print, then Save as PDF.")
-        )
-
-    st.download_button(
-        t("Download data (CSV)"),
-        data=ug.to_safe_csv_bytes(cleaned),
-        file_name="cleaned_dataset.csv",
-        mime="text/csv",
-        key=f"biz_dl_csv_{file_sig}",
-    )
+        if pdf_bytes:
+            report_col.download_button(
+                t("Download report"),
+                data=pdf_bytes,
+                file_name="business_report.pdf",
+                mime="application/pdf",
+                key=f"biz_dl_pdf_{file_sig}",
+            )
+        else:
+            html_report = br.build_report_html(time_series=time_series, time_unit=time_unit, **report_args)
+            report_col.download_button(
+                t("Download report"),
+                data=html_report.encode("utf-8"),
+                file_name="business_report.html",
+                mime="text/html",
+                key=f"biz_dl_html_{file_sig}",
+            )
